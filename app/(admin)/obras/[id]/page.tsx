@@ -12,7 +12,6 @@ type MaterialAsignado = {
   } | null;
 };
 
-// 👇 Exportar la función recibiendo params sin declarar tipo extra
 export default async function ObraDetallePage({
   params,
 }: {
@@ -20,7 +19,6 @@ export default async function ObraDetallePage({
 }) {
   const supabase = getServerSupabase();
 
-  // 1. Traer obra
   const { data: obra, error: e1 } = await supabase
     .from("obra")
     .select("id, nombre, cliente, estado, created_at")
@@ -31,7 +29,6 @@ export default async function ObraDetallePage({
     return <p className="text-red-600">Error cargando obra</p>;
   }
 
-  // 2. Traer materiales asignados
   const { data: materiales, error: e2 } = await supabase
     .from("obra_material")
     .select(

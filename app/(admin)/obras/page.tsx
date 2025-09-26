@@ -1,7 +1,17 @@
-import { supabase } from '@/lib/supabaseClient'
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 
 export default async function ObrasPage() {
-  const { data: obras } = await supabase.from('obra').select('id, nombre, cliente, estado')
+  const cookieStore = await cookies()   // 👈 Await obligatorio
+  const supabase = createServerComponentClient({ cookies: () => cookieStore })
+
+  const { data: obras, error } = await supabase
+    .from('obra')
+    .select('id, nombre, cliente, estado')
+
+  if (error) {
+    console.error("❌ Error cargando obras:", error.message)
+  }
 
   return (
     <div>

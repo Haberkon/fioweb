@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { ArrowRightOnRectangleIcon } from "@heroicons/react/24/outline";
 
@@ -27,9 +28,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex min-h-screen">
       {/* Sidebar */}
       <aside className="w-64 bg-gray-900 text-gray-100 flex flex-col">
-        <div className="p-4 text-xl font-bold border-b border-gray-700">
-          Dashboard
+        <div className="p-4 flex justify-center border-b border-gray-700">
+          <Link href="/obras">
+            <Image
+              src="/images/LogoFio.png" // ✅ desde public/images
+              alt="Fiocam Logo"
+              width={140}
+              height={40}
+              priority
+            />
+          </Link>
         </div>
+
         <nav className="flex-1 p-4 space-y-2">
           {navItems.map((item) => (
             <Link
@@ -41,6 +51,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </Link>
           ))}
         </nav>
+
         <button
           onClick={handleLogout}
           className="m-4 flex items-center justify-center gap-2 border border-gray-600 text-gray-300 rounded-md px-3 py-2 text-sm hover:bg-gray-800 hover:text-white transition"

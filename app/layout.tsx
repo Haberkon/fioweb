@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FIO Admin",
-  description: "Dashboard de administración",
+  title: "Fiocam WebApp",
+  description: "Dashboard Fiocam Obras y Redes",
 };
 
 export default function RootLayout({

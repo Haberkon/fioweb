@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function LoginPage() {
@@ -37,6 +38,16 @@ export default function LoginPage() {
         onSubmit={handleLogin}
         className="bg-white shadow-md rounded-lg p-8 w-full max-w-sm space-y-4"
       >
+        <div className="flex justify-center mb-4">
+          <Image
+            src="/images/LogoFiocam.png" // ✅ desde public/images
+            alt="Fiocam Logo"
+            width={160}
+            height={160}
+            priority
+          />
+        </div>
+
         <h1 className="text-2xl font-bold text-center">Ingreso Admin</h1>
 
         <input

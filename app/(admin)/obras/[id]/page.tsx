@@ -1,3 +1,4 @@
+// app/(admin)/obras/[id]/page.tsx
 import { getServerSupabase } from "@/lib/supabaseServer";
 
 // Tipo para cada fila de obra_material con join a material
@@ -12,11 +13,13 @@ type MaterialAsignado = {
   } | null;
 };
 
-export default async function ObraDetallePage({
-  params,
-}: {
-  params: { id: string };
-}) {
+type PageProps = {
+  params: {
+    id: string;
+  };
+};
+
+export default async function ObraDetallePage({ params }: PageProps) {
   const supabase = getServerSupabase();
 
   // 1. Traer obra
@@ -30,7 +33,7 @@ export default async function ObraDetallePage({
     return <p className="text-red-600">Error cargando obra</p>;
   }
 
-  // 2. Traer materiales asignados (ya tipado con returns)
+  // 2. Traer materiales asignados
   const { data: materiales, error: e2 } = await supabase
     .from("obra_material")
     .select(
@@ -46,7 +49,7 @@ export default async function ObraDetallePage({
     `
     )
     .eq("obra_id", params.id)
-    .returns<MaterialAsignado[]>(); // 👈 Tipado directo
+    .returns<MaterialAsignado[]>();
 
   if (e2) {
     return (

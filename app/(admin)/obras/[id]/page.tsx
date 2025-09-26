@@ -1,7 +1,6 @@
 // app/(admin)/obras/[id]/page.tsx
 import { getServerSupabase } from "@/lib/supabaseServer";
 
-// Tipo para cada fila de obra_material con join a material
 type MaterialAsignado = {
   id: string;
   cantidad_planificada: number | null;
@@ -13,13 +12,12 @@ type MaterialAsignado = {
   } | null;
 };
 
-type PageProps = {
-  params: {
-    id: string;
-  };
-};
-
-export default async function ObraDetallePage({ params }: PageProps) {
+// 👇 Exportar la función recibiendo params sin declarar tipo extra
+export default async function ObraDetallePage({
+  params,
+}: {
+  params: { id: string };
+}) {
   const supabase = getServerSupabase();
 
   // 1. Traer obra

@@ -32,7 +32,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/obras">
             <Image
               src="/images/LogoFio.png" // ✅ desde public/images
-              alt="Fiocam Logo"
+              alt="Fio Logo"
               width={140}
               height={40}
               priority

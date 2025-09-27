@@ -40,10 +40,10 @@ export default function LoginPage() {
       >
         <div className="flex justify-center mb-4">
           <Image
-            src="/images/LogoFiocam.png" // ✅ desde public/images
+            src="/images/logofiocam.png" // ✅ desde public/images
             alt="Fiocam Logo"
-            width={160}
-            height={160}
+            width={140}
+            height={40}
             priority
           />
         </div>

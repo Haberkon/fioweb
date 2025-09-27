@@ -31,5 +31,7 @@ export async function middleware(req: NextRequest) {
 
 // Protege todo excepto /login y assets estáticos
 export const config = {
-  matcher: ["/((?!login|_next/static|_next/image|favicon.ico).*)"],
+ matcher: [
+    "/((?!login|api|health|_next/static|_next/image|images|favicon.ico).*)",
+  ],
 };

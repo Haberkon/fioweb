@@ -1,4 +1,5 @@
 // app/(admin)/obras/[id]/page.tsx
+export const runtime = "nodejs";
 
 type ObraPageProps = {
   params: {

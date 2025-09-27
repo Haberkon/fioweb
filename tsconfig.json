@@ -14,8 +14,10 @@
 
     /* ✅ Fix para react-pdf y cualquier lib externa */
     "skipLibCheck": true,
+    "noEmitOnError": false,
 
     /* ✅ Estricto en chequeos */
+  
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,

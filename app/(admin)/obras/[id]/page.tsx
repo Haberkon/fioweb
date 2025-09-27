@@ -1,13 +1,17 @@
 // app/(admin)/obras/[id]/page.tsx
 
-export default function TestPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+type Props = {
+  params: {
+    id: string;
+  };
+};
+
+export default function ObraDetallePage(props: Props) {
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold">Test Obra {params.id}</h1>
+      <h1 className="text-2xl font-bold">
+        Detalle de obra {props.params.id}
+      </h1>
     </div>
   );
 }

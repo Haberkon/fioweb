@@ -45,6 +45,7 @@ export default function LoginPage() {
             width={140}
             height={40}
             priority
+            unoptimized
           />
         </div>
 

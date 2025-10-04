@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 
+type Tecnico = {
+  id: string;
+  nombre: string;
+  apellido: string;
+};
+
 type Obra = {
   id: string;
   nombre: string;
@@ -14,10 +20,16 @@ type Obra = {
   tecnicos?: Tecnico[];
 };
 
-type Tecnico = {
+type ObraRow = {
   id: string;
   nombre: string;
-  apellido: string;
+  cliente: string | null;
+  estado: string | null;
+  created_at: string | null;
+  obra_tecnico: {
+    tecnico_id: string;
+    app_user: Tecnico | null;
+  }[];
 };
 
 const estados = ["planificada", "en_progreso", "finalizada"];
@@ -49,13 +61,16 @@ export default function ObrasPage() {
       `)
       .order("created_at", { ascending: false });
 
-    if (error) console.error("Error obras:", error.message);
+    if (error) {
+      console.error("Error obras:", error.message);
+      return;
+    }
 
-    const obrasMap = (data ?? []).map((o: any) => ({
+    const obrasMap: Obra[] = (data as ObraRow[] ?? []).map((o) => ({
       ...o,
       tecnicos: (o.obra_tecnico ?? [])
-        .map((ot: any) => ot.app_user)
-        .filter((u: any) => u !== null),
+        .map((ot) => ot.app_user)
+        .filter((u): u is Tecnico => u !== null),
     }));
 
     setObras(obrasMap);
@@ -72,7 +87,7 @@ export default function ObrasPage() {
         .ilike("nombre", `%${text}%`);
 
       if (error) console.error("Error búsqueda técnicos:", error.message);
-      setFilteredTecnicos(data ?? []);
+      setFilteredTecnicos((data ?? []) as Tecnico[]);
     } else {
       setFilteredTecnicos([]);
     }
@@ -94,7 +109,7 @@ export default function ObrasPage() {
     cargarObras();
   };
 
-  const handleCreateObra = async (form: any) => {
+  const handleCreateObra = async (form: Record<string, FormDataEntryValue>) => {
     await supabase.from("obra").insert(form);
     setShowCreatePopup(false);
     cargarObras();
@@ -123,6 +138,7 @@ export default function ObrasPage() {
       obra_id: obraSeleccionada.id,
       tecnico_id: tecnicoId,
     }));
+
     if (rows.length > 0) {
       await supabase.from("obra_tecnico").insert(rows);
     }
@@ -252,129 +268,129 @@ export default function ObrasPage() {
       </table>
 
       {/* Popup Crear Obra */}
-{showCreatePopup && (
-  <div className="fixed inset-0 flex items-center justify-center bg-gray-200/40 z-50">
-    <div className="bg-white rounded-lg shadow-lg p-6 w-96 border border-gray-200">
-      <h2 className="text-lg font-semibold mb-4">Crear nueva obra</h2>
-      <form
-        className="space-y-3"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const form = Object.fromEntries(new FormData(e.currentTarget));
-          await handleCreateObra(form);
-        }}
-      >
-        <input name="nombre" placeholder="Nombre" className="border p-2 w-full" required />
-        <input name="cliente" placeholder="Cliente" className="border p-2 w-full" />
-        <select name="estado" className="border p-2 w-full">
-          {estados.map((est) => (
-            <option key={est} value={est}>{est}</option>
-          ))}
-        </select>
-        <input name="fecha_ingreso" type="date" className="border p-2 w-full" />
+      {showCreatePopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-200/40 z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-96 border border-gray-200">
+            <h2 className="text-lg font-semibold mb-4">Crear nueva obra</h2>
+            <form
+              className="space-y-3"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = Object.fromEntries(new FormData(e.currentTarget));
+                await handleCreateObra(form);
+              }}
+            >
+              <input name="nombre" placeholder="Nombre" className="border p-2 w-full" required />
+              <input name="cliente" placeholder="Cliente" className="border p-2 w-full" />
+              <select name="estado" className="border p-2 w-full">
+                {estados.map((est) => (
+                  <option key={est} value={est}>{est}</option>
+                ))}
+              </select>
+              <input name="fecha_ingreso" type="date" className="border p-2 w-full" />
 
-        <div className="flex justify-end gap-2 mt-4">
-          <button
-            type="button"
-            onClick={() => setShowCreatePopup(false)}
-            className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
-          >
-            Cancelar
-          </button>
-          <button type="submit" className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
-            Guardar
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
-
-{/* Popup Asignar Técnicos */}
-{showAsignarPopup && obraSeleccionada && (
-  <div className="fixed inset-0 flex items-center justify-center bg-gray-200/40 z-50">
-    <div className="bg-white rounded-lg shadow-lg p-6 w-[420px] border border-gray-200 relative">
-      <h2 className="text-lg font-semibold mb-3">
-        Asignar técnicos a {obraSeleccionada.nombre}
-      </h2>
-
-      {/* Buscador */}
-      <div className="relative">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => handleSearchTecnico(e.target.value)}
-          placeholder="Buscar técnico..."
-          className="border p-2 w-full mb-3"
-        />
-
-        {search.length > 1 && filteredTecnicos.length > 0 && (
-          <ul className="absolute left-0 right-0 bg-white border rounded shadow max-h-40 overflow-y-auto z-10">
-            {filteredTecnicos.map((t) => (
-              <li
-                key={t.id}
-                onClick={() => {
-                  if (!selectedTecnicos.includes(t.id)) {
-                    setSelectedTecnicos((prev) => [...prev, t.id]);
-                  }
-                  setSearch("");
-                  setFilteredTecnicos([]);
-                }}
-                className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-              >
-                {t.nombre} {t.apellido}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* Técnicos seleccionados */}
-      <div className="mt-3 space-y-1">
-        {selectedTecnicos.length > 0 ? (
-          selectedTecnicos.map((id) => {
-            const t = filteredTecnicos.find((ft) => ft.id === id) ||
-                      obraSeleccionada.tecnicos?.find((ot) => ot.id === id);
-            return (
-              <div key={id} className="flex items-center justify-between border p-2 rounded">
-                <span>{t?.nombre} {t?.apellido}</span>
+              <div className="flex justify-end gap-2 mt-4">
                 <button
-                  onClick={() =>
-                    setSelectedTecnicos((prev) => prev.filter((tid) => tid !== id))
-                  }
-                  className="text-red-500 hover:text-red-700 text-sm"
+                  type="button"
+                  onClick={() => setShowCreatePopup(false)}
+                  className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
                 >
-                  ❌
+                  Cancelar
+                </button>
+                <button type="submit" className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
+                  Guardar
                 </button>
               </div>
-            );
-          })
-        ) : (
-          <span className="text-gray-400 text-sm">Ningún técnico seleccionado</span>
-        )}
-      </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-      {/* Botones */}
-      <div className="flex justify-end gap-2 mt-5">
-        <button
-          onClick={() => setShowAsignarPopup(false)}
-          className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={handleAsignarTecnicos}
-          className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          Guardar
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      {/* Popup Asignar Técnicos */}
+      {showAsignarPopup && obraSeleccionada && (
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-200/40 z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-[420px] border border-gray-200 relative">
+            <h2 className="text-lg font-semibold mb-3">
+              Asignar técnicos a {obraSeleccionada.nombre}
+            </h2>
 
+            {/* Buscador */}
+            <div className="relative">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => handleSearchTecnico(e.target.value)}
+                placeholder="Buscar técnico..."
+                className="border p-2 w-full mb-3"
+              />
 
-      
+              {search.length > 1 && filteredTecnicos.length > 0 && (
+                <ul className="absolute left-0 right-0 bg-white border rounded shadow max-h-40 overflow-y-auto z-10">
+                  {filteredTecnicos.map((t) => (
+                    <li
+                      key={t.id}
+                      onClick={() => {
+                        if (!selectedTecnicos.includes(t.id)) {
+                          setSelectedTecnicos((prev) => [...prev, t.id]);
+                        }
+                        setSearch("");
+                        setFilteredTecnicos([]);
+                      }}
+                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                    >
+                      {t.nombre} {t.apellido}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Técnicos seleccionados */}
+            <div className="mt-3 space-y-1">
+              {selectedTecnicos.length > 0 ? (
+                selectedTecnicos.map((id) => {
+                  const t =
+                    filteredTecnicos.find((ft) => ft.id === id) ||
+                    obraSeleccionada.tecnicos?.find((ot) => ot.id === id);
+                  return (
+                    <div key={id} className="flex items-center justify-between border p-2 rounded">
+                      <span>{t?.nombre} {t?.apellido}</span>
+                      <button
+                        onClick={() =>
+                          setSelectedTecnicos((prev) =>
+                            prev.filter((tid) => tid !== id)
+                          )
+                        }
+                        className="text-red-500 hover:text-red-700 text-sm"
+                      >
+                        ❌
+                      </button>
+                    </div>
+                  );
+                })
+              ) : (
+                <span className="text-gray-400 text-sm">Ningún técnico seleccionado</span>
+              )}
+            </div>
+
+            {/* Botones */}
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => setShowAsignarPopup(false)}
+                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleAsignarTecnicos}
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

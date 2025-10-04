@@ -55,7 +55,7 @@ export default function ObrasPage() {
       ...o,
       tecnicos: (o.obra_tecnico ?? [])
         .map((ot: any) => ot.app_user)
-        .filter((u: any) => u !== null), // ✅ filtramos nulos
+        .filter((u: any) => u !== null),
     }));
 
     setObras(obrasMap);
@@ -117,13 +117,8 @@ export default function ObrasPage() {
   const handleAsignarTecnicos = async () => {
     if (!obraSeleccionada) return;
 
-    // limpiar asignaciones anteriores
-    await supabase
-      .from("obra_tecnico")
-      .delete()
-      .eq("obra_id", obraSeleccionada.id);
+    await supabase.from("obra_tecnico").delete().eq("obra_id", obraSeleccionada.id);
 
-    // insertar nuevas asignaciones
     const rows = selectedTecnicos.map((tecnicoId) => ({
       obra_id: obraSeleccionada.id,
       tecnico_id: tecnicoId,
@@ -239,18 +234,12 @@ export default function ObrasPage() {
                 {obra.tecnicos && obra.tecnicos.length > 0 ? (
                   <ul className="text-sm space-y-1">
                     {obra.tecnicos.map((t) => (
-                      <li key={t.id}>{t.nombre} {t.apellido}</li>
+                      <li key={t.id}>• {t.nombre} {t.apellido}</li>
                     ))}
                   </ul>
                 ) : (
                   <span className="text-gray-400">Sin técnicos</span>
                 )}
-                <button
-                  onClick={() => abrirAsignarTecnicos(obra)}
-                  className="mt-2 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 border text-xs"
-                >
-                  👷 Asignar
-                </button>
               </td>
               <td className="p-2 border text-center">
                 <Link href={`/obras/${obra.id}`} className="text-blue-600 hover:underline">
@@ -263,47 +252,48 @@ export default function ObrasPage() {
       </table>
 
       {/* Popup Crear Obra */}
-      {showCreatePopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-96">
-            <h2 className="text-lg font-semibold mb-4">Crear nueva obra</h2>
-            <form
-              className="space-y-3"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const form = Object.fromEntries(new FormData(e.currentTarget));
-                await handleCreateObra(form);
-              }}
-            >
-              <input name="nombre" placeholder="Nombre" className="border p-2 w-full" required />
-              <input name="cliente" placeholder="Cliente" className="border p-2 w-full" />
-              <select name="estado" className="border p-2 w-full">
-                {estados.map((est) => (
-                  <option key={est} value={est}>{est}</option>
-                ))}
-              </select>
-              <input name="fecha_ingreso" type="date" className="border p-2 w-full" />
+{showCreatePopup && (
+  <div className="fixed inset-0 flex items-center justify-center bg-gray-200/40 z-50">
+    <div className="bg-white rounded-lg shadow-lg p-6 w-96 border border-gray-200">
+      <h2 className="text-lg font-semibold mb-4">Crear nueva obra</h2>
+      <form
+        className="space-y-3"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const form = Object.fromEntries(new FormData(e.currentTarget));
+          await handleCreateObra(form);
+        }}
+      >
+        <input name="nombre" placeholder="Nombre" className="border p-2 w-full" required />
+        <input name="cliente" placeholder="Cliente" className="border p-2 w-full" />
+        <select name="estado" className="border p-2 w-full">
+          {estados.map((est) => (
+            <option key={est} value={est}>{est}</option>
+          ))}
+        </select>
+        <input name="fecha_ingreso" type="date" className="border p-2 w-full" />
 
-              <div className="flex justify-end gap-2 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowCreatePopup(false)}
-                  className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
-                  Guardar
-                </button>
-              </div>
-            </form>
-          </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <button
+            type="button"
+            onClick={() => setShowCreatePopup(false)}
+            className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
+          >
+            Cancelar
+          </button>
+          <button type="submit" className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
+            Guardar
+          </button>
         </div>
-      )}
+      </form>
+    </div>
+  </div>
+)}
 
-     {showAsignarPopup && obraSeleccionada && (
-  <div className="absolute inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 z-50">
-    <div className="bg-white rounded-lg shadow-lg p-6 w-[420px] relative">
+{/* Popup Asignar Técnicos */}
+{showAsignarPopup && obraSeleccionada && (
+  <div className="fixed inset-0 flex items-center justify-center bg-gray-200/40 z-50">
+    <div className="bg-white rounded-lg shadow-lg p-6 w-[420px] border border-gray-200 relative">
       <h2 className="text-lg font-semibold mb-3">
         Asignar técnicos a {obraSeleccionada.nombre}
       </h2>
@@ -318,7 +308,6 @@ export default function ObrasPage() {
           className="border p-2 w-full mb-3"
         />
 
-        {/* Dropdown resultados */}
         {search.length > 1 && filteredTecnicos.length > 0 && (
           <ul className="absolute left-0 right-0 bg-white border rounded shadow max-h-40 overflow-y-auto z-10">
             {filteredTecnicos.map((t) => (
@@ -328,7 +317,7 @@ export default function ObrasPage() {
                   if (!selectedTecnicos.includes(t.id)) {
                     setSelectedTecnicos((prev) => [...prev, t.id]);
                   }
-                  setSearch(""); // limpiar buscador
+                  setSearch("");
                   setFilteredTecnicos([]);
                 }}
                 className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
@@ -384,6 +373,8 @@ export default function ObrasPage() {
   </div>
 )}
 
+
+      
     </div>
   );
 }

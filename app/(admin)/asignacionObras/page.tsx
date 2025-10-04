@@ -17,14 +17,8 @@ type Tecnico = {
 
 type ObraTecnicoRow = {
   tecnico_id: string;
-  app_user: { id: string; nombre: string; apellido: string }[]; // 👈 ahora es array
+  app_user: { id: string; nombre: string; apellido: string }[];
 };
-
-const tecnicos: Tecnico[] =
-  ((data as unknown as ObraTecnicoRow[] | null)
-    ?.flatMap((t) => t.app_user) // 👈 extrae cada elemento del array
-    .filter((u): u is Tecnico => !!u && !!u.id)) ?? [];
-
 
 export default function AsignacionObrasPage() {
   const [obras, setObras] = useState<Obra[]>([]);
@@ -62,33 +56,33 @@ export default function AsignacionObrasPage() {
   // 🧱 Cargar técnicos asignados a una obra
   // =====================================================
   const cargarTecnicosAsignados = async (obraId: string) => {
-  const { data, error } = await supabase
-    .from("obra_tecnico")
-    .select(`
-      tecnico_id,
-      app_user (id, nombre, apellido)
-    `)
-    .eq("obra_id", obraId);
+    const { data, error } = await supabase
+      .from("obra_tecnico")
+      .select(`
+        tecnico_id,
+        app_user (id, nombre, apellido)
+      `)
+      .eq("obra_id", obraId);
 
-  if (error) {
-    console.error("Error cargando técnicos:", error);
-    setTecnicosAsignados([]);
-    return;
-  }
+    if (error) {
+      console.error("Error cargando técnicos:", error);
+      setTecnicosAsignados([]);
+      return;
+    }
 
-  // Tipado fuerte: app_user es un array según la respuesta de Supabase
-  type ObraTecnicoRow = {
-    tecnico_id: string;
-    app_user: { id: string; nombre: string; apellido: string }[];
+    // ✅ Tipado fuerte y seguro
+    type ObraTecnicoRow = {
+      tecnico_id: string;
+      app_user: { id: string; nombre: string; apellido: string }[];
+    };
+
+    const tecnicos: Tecnico[] =
+      ((data as unknown as ObraTecnicoRow[] | null)
+        ?.flatMap((t) => t.app_user) // aplanamos arrays
+        .filter((u): u is Tecnico => !!u && !!u.id)) ?? [];
+
+    setTecnicosAsignados(tecnicos);
   };
-
-  const tecnicos: Tecnico[] =
-    ((data as unknown as ObraTecnicoRow[] | null)
-      ?.flatMap((t) => t.app_user) // aplanamos los arrays de app_user
-      .filter((u): u is Tecnico => !!u && !!u.id)) ?? [];
-
-  setTecnicosAsignados(tecnicos);
-};
 
   // =====================================================
   // 🔍 Buscar técnicos disponibles

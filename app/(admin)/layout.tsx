@@ -1,23 +1,39 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import { ArrowRightOnRectangleIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowRightOnRectangleIcon,
+  Bars3Icon,
+  ChevronLeftIcon,
+  HomeIcon,
+  CubeIcon,
+  PhotoIcon,
+  MapIcon,
+  ClipboardDocumentListIcon,
+  UserIcon,
+  BuildingOfficeIcon,
+  TruckIcon,
+} from "@heroicons/react/24/outline";
 
 const navItems = [
-  { href: "/obras", label: "Obras" },
-  { href: "/materiales", label: "Materiales" },
-  { href: "/planos", label: "Planos" },
-  { href: "/fotos", label: "Fotos" },
-  { href: "/stock", label: "Stock" },
-  { href: "/ubicaciones", label: "Ubicaciones" },
-  { href: "/perfil", label: "Perfil" },
+  { href: "/obras", label: "Obras", icon: BuildingOfficeIcon },
+  { href: "/materiales", label: "Materiales", icon: CubeIcon },
+  { href: "/planos", label: "Planos", icon: ClipboardDocumentListIcon },
+  { href: "/fotos", label: "Fotos", icon: PhotoIcon },
+  { href: "/stock", label: "Stock", icon: TruckIcon },
+  { href: "/ubicaciones", label: "Ubicaciones", icon: MapIcon },
+  { href: "/asignacionObras", label: "Asignación", icon: HomeIcon },
+  { href: "/perfil", label: "Perfil", icon: UserIcon },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [collapsed, setCollapsed] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -25,44 +41,95 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden bg-gray-100">
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 text-gray-100 flex flex-col">
-        <div className="p-4 flex justify-center border-b border-gray-700">
-          <Link href="/obras">
-            <Image
-              src="/images/LogoFio.png" // ✅ desde public/images
-              alt="Fio Logo"
-              width={140}
-              height={40}
-              priority
-            />
-          </Link>
+      <aside
+        className={`${
+          collapsed ? "w-20" : "w-64"
+        } bg-gray-900 text-gray-100 flex flex-col fixed inset-y-0 transition-all duration-300`}
+      >
+        {/* Logo + Toggle */}
+        <div className="relative flex items-center justify-center pt-3 pb-3 border-b border-gray-700">
+            {collapsed ? (
+  <Link href="/obras">
+    <Image
+      src="/images/LogoFiocamBurger.png"
+      alt="Fio Icon"
+      width={40}
+      height={40}
+      priority
+      className="mx-auto mt-10"  // 👈 agrega ~20 px de margen superior
+    />
+  </Link>
+) : (
+  <Link href="/obras">
+    <Image
+      src="/images/LogoFio.png"
+      alt="Fio Logo"
+      width={140}
+      height={40}
+      priority
+    />
+  </Link>
+)}
+
+          {/* 🔹 Flecha para colapsar/expandir */}
+         <button
+          onClick={() => setCollapsed(!collapsed)}
+          className={`absolute top-3 p-1 rounded hover:bg-gray-800 transition ${
+            collapsed ? "left-1/2 -translate-x-1/2" : "right-3"
+          }`}
+        >
+          {collapsed ? (
+            <Bars3Icon className="h-6 w-6 text-gray-300" />
+          ) : (
+            <ChevronLeftIcon className="h-6 w-6 text-gray-300" />
+          )}
+        </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="block px-3 py-2 rounded hover:bg-gray-700 transition"
-            >
-              {item.label}
-            </Link>
-          ))}
+        {/* Navegación */}
+       <nav className="flex-1 overflow-y-auto p-3 space-y-1 mt-9">
+          {navItems.map(({ href, label, icon: Icon }) => {
+            const active = pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-3 px-3 py-2 rounded transition ${
+                  active
+                    ? "bg-gray-800 text-white"
+                    : "hover:bg-gray-700 text-gray-300"
+                }`}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                {!collapsed && <span className="truncate">{label}</span>}
+              </Link>
+            );
+          })}
         </nav>
 
-        <button
-          onClick={handleLogout}
-          className="m-4 flex items-center justify-center gap-2 border border-gray-600 text-gray-300 rounded-md px-3 py-2 text-sm hover:bg-gray-800 hover:text-white transition"
-        >
-          <ArrowRightOnRectangleIcon className="h-4 w-4" />
-          Cerrar sesión
-        </button>
+        {/* Logout */}
+        <div className="p-4 border-t border-gray-700">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 border border-gray-600 text-gray-300 rounded-md px-3 py-2 text-sm hover:bg-gray-800 hover:text-white transition"
+          >
+            <ArrowRightOnRectangleIcon className="h-5 w-5" />
+            {!collapsed && <span>Cerrar sesión</span>}
+          </button>
+        </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 p-6 bg-gray-50">{children}</main>
+      {/* Contenido principal */}
+      <main
+        className={`flex-1 h-screen overflow-y-auto p-6 bg-gray-50 transition-all duration-300 ${
+          collapsed ? "ml-20" : "ml-64"
+        }`}
+      >
+        {/* ✅ Eliminado el burger duplicado */}
+        {children}
+      </main>
     </div>
   );
 }

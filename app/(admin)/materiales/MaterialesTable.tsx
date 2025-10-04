@@ -45,8 +45,8 @@ export default function MaterialesTable({ materiales }: { materiales: Material[]
     return sortDir === "asc" ? "↑" : "↓";
   };
 
-  return (
-    <table className="w-full border">
+  return (<div className="overflow-x-auto overflow-y-auto max-h-[70vh] rounded-lg border border-gray-200 shadow-sm">
+    <table className="w-full border text-sm text-gray-700">
       <thead>
         <tr className="bg-gray-200">
           <th className="p-2 border cursor-pointer" onClick={() => handleSort("codigo")}>
@@ -84,5 +84,6 @@ export default function MaterialesTable({ materiales }: { materiales: Material[]
         ))}
       </tbody>
     </table>
+</div>
   );
 }

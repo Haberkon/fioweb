@@ -66,12 +66,12 @@ export default function ObrasPage() {
       return;
     }
 
-    const obrasMap: Obra[] = (data as ObraRow[] ?? []).map((o) => ({
-      ...o,
-      tecnicos: (o.obra_tecnico ?? [])
-        .map((ot) => ot.app_user)
-        .filter((u): u is Tecnico => u !== null),
-    }));
+    const obrasMap: Obra[] = ((data as unknown) as ObraRow[] ?? []).map((o) => ({
+  ...o,
+  tecnicos: (o.obra_tecnico ?? [])
+    .map((ot) => ot.app_user)
+    .filter((u): u is Tecnico => u !== null),
+}));
 
     setObras(obrasMap);
   };

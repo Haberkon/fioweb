@@ -15,6 +15,17 @@ type Tecnico = {
   apellido: string;
 };
 
+type ObraTecnicoRow = {
+  tecnico_id: string;
+  app_user: { id: string; nombre: string; apellido: string }[]; // 👈 ahora es array
+};
+
+const tecnicos: Tecnico[] =
+  ((data as unknown as ObraTecnicoRow[] | null)
+    ?.flatMap((t) => t.app_user) // 👈 extrae cada elemento del array
+    .filter((u): u is Tecnico => !!u && !!u.id)) ?? [];
+
+
 export default function AsignacionObrasPage() {
   const [obras, setObras] = useState<Obra[]>([]);
   const [obraSeleccionada, setObraSeleccionada] = useState<string | null>(null);
@@ -51,26 +62,33 @@ export default function AsignacionObrasPage() {
   // 🧱 Cargar técnicos asignados a una obra
   // =====================================================
   const cargarTecnicosAsignados = async (obraId: string) => {
-    const { data, error } = await supabase
-      .from("obra_tecnico")
-      .select(`
-        tecnico_id,
-        app_user (id, nombre, apellido)
-      `)
-      .eq("obra_id", obraId);
+  const { data, error } = await supabase
+    .from("obra_tecnico")
+    .select(`
+      tecnico_id,
+      app_user (id, nombre, apellido)
+    `)
+    .eq("obra_id", obraId);
 
-    if (error) {
-      console.error("Error cargando técnicos:", error);
-      setTecnicosAsignados([]);
-      return;
-    }
+  if (error) {
+    console.error("Error cargando técnicos:", error);
+    setTecnicosAsignados([]);
+    return;
+  }
 
-    const tecnicos: Tecnico[] = (data ?? [])
-      .map((t: any) => t.app_user)
-      .filter((u: any): u is Tecnico => !!u && !!u.id);
-
-    setTecnicosAsignados(tecnicos);
+  // Tipado fuerte: app_user es un array según la respuesta de Supabase
+  type ObraTecnicoRow = {
+    tecnico_id: string;
+    app_user: { id: string; nombre: string; apellido: string }[];
   };
+
+  const tecnicos: Tecnico[] =
+    ((data as unknown as ObraTecnicoRow[] | null)
+      ?.flatMap((t) => t.app_user) // aplanamos los arrays de app_user
+      .filter((u): u is Tecnico => !!u && !!u.id)) ?? [];
+
+  setTecnicosAsignados(tecnicos);
+};
 
   // =====================================================
   // 🔍 Buscar técnicos disponibles
@@ -94,8 +112,8 @@ export default function AsignacionObrasPage() {
     }
 
     const tecnicos = (data ?? []).filter(
-      (t: any) => t.rol && t.rol.toLowerCase().includes("tecnico")
-    );
+      (t) => t.rol && t.rol.toLowerCase().includes("tecnico")
+    ) as Tecnico[];
 
     setResultados(tecnicos);
   };

@@ -110,10 +110,32 @@ export default function ObrasPage() {
   };
 
   const handleCreateObra = async (form: Record<string, FormDataEntryValue>) => {
-    await supabase.from("obra").insert(form);
-    setShowCreatePopup(false);
-    cargarObras();
+  // Convertimos los datos del formulario a un formato limpio
+  const nuevaObra = {
+    nombre: (form.nombre as string)?.trim(),
+    cliente: (form.cliente as string)?.trim() || null,
+    estado: (form.estado as string) || "planificada",
+    fecha_ingreso: form.fecha_ingreso ? (form.fecha_ingreso as string) : null,
   };
+
+  // Validación simple
+  if (!nuevaObra.nombre) {
+    alert("El nombre de la obra es obligatorio.");
+    return;
+  }
+
+  const { error } = await supabase.from("obra").insert(nuevaObra);
+
+  if (error) {
+    console.error("Error al crear obra:", error.message);
+    alert("Error al crear la obra: " + error.message);
+    return;
+  }
+
+  setShowCreatePopup(false);
+  cargarObras(); // 🔄 recarga la lista
+};
+
 
   const abrirAsignarTecnicos = async (obra: Obra) => {
     setObraSeleccionada(obra);

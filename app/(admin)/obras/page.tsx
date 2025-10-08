@@ -13,8 +13,8 @@ type Tecnico = {
 type Obra = {
   id: string;
   nombre: string;
-  cliente: string | null;
   estado: string | null;
+  numero_obra: number | null;
   fecha_ingreso?: string | null;
   created_at?: string | null;
   tecnicos?: Tecnico[];
@@ -23,8 +23,8 @@ type Obra = {
 type ObraRow = {
   id: string;
   nombre: string;
-  cliente: string | null;
   estado: string | null;
+  numero_obra: number | null;
   created_at: string | null;
   obra_tecnico: {
     tecnico_id: string;
@@ -32,7 +32,14 @@ type ObraRow = {
   }[];
 };
 
-const estados = ["planificada", "en_progreso", "finalizada"];
+const estados = [
+  "planificada",
+  "a_ejecutar",
+  "en_curso",
+  "pausada",
+  "finalizada",
+  "cancelada",
+];
 
 export default function ObrasPage() {
   const [obras, setObras] = useState<Obra[]>([]);
@@ -53,39 +60,38 @@ export default function ObrasPage() {
     const { data, error } = await supabase
       .from("obra")
       .select(`
-        id, nombre, cliente, estado, created_at,
+        id, nombre, estado, numero_obra, created_at,
         obra_tecnico (
           tecnico_id,
           app_user (id, nombre, apellido)
         )
       `)
-      .order("created_at", { ascending: false });
+      .order("numero_obra", { ascending: true });
 
     if (error) {
       console.error("Error obras:", error.message);
       return;
     }
 
-    const obrasMap: Obra[] = ((data as unknown) as ObraRow[] ?? []).map((o) => ({
-  ...o,
-  tecnicos: (o.obra_tecnico ?? [])
-    .map((ot) => ot.app_user)
-    .filter((u): u is Tecnico => u !== null),
-}));
+    const obrasMap: Obra[] =
+      ((data as unknown) as ObraRow[] ?? []).map((o) => ({
+        ...o,
+        tecnicos: (o.obra_tecnico ?? [])
+          .map((ot) => ot.app_user)
+          .filter((u): u is Tecnico => u !== null),
+      }));
 
     setObras(obrasMap);
   };
 
   const handleSearchTecnico = async (text: string) => {
     setSearch(text);
-
     if (text.length > 1) {
       const { data, error } = await supabase
         .from("app_user")
         .select("id,nombre,apellido")
         .eq("rol", "tecnico")
         .ilike("nombre", `%${text}%`);
-
       if (error) console.error("Error búsqueda técnicos:", error.message);
       setFilteredTecnicos((data ?? []) as Tecnico[]);
     } else {
@@ -110,61 +116,47 @@ export default function ObrasPage() {
   };
 
   const handleCreateObra = async (form: Record<string, FormDataEntryValue>) => {
-  // Convertimos los datos del formulario a un formato limpio
-  const nuevaObra = {
-    nombre: (form.nombre as string)?.trim(),
-    cliente: (form.cliente as string)?.trim() || null,
-    estado: (form.estado as string) || "planificada",
-    fecha_ingreso: form.fecha_ingreso ? (form.fecha_ingreso as string) : null,
+    const nuevaObra = {
+      nombre: (form.nombre as string)?.trim(),
+      estado: (form.estado as string) || "planificada",
+      fecha_ingreso: form.fecha_ingreso ? (form.fecha_ingreso as string) : null,
+    };
+
+    if (!nuevaObra.nombre) {
+      alert("El nombre de la obra es obligatorio.");
+      return;
+    }
+
+    const { error } = await supabase.from("obra").insert(nuevaObra);
+    if (error) {
+      console.error("Error al crear obra:", error.message);
+      alert("Error al crear la obra: " + error.message);
+      return;
+    }
+
+    setShowCreatePopup(false);
+    cargarObras();
   };
-
-  // Validación simple
-  if (!nuevaObra.nombre) {
-    alert("El nombre de la obra es obligatorio.");
-    return;
-  }
-
-  const { error } = await supabase.from("obra").insert(nuevaObra);
-
-  if (error) {
-    console.error("Error al crear obra:", error.message);
-    alert("Error al crear la obra: " + error.message);
-    return;
-  }
-
-  setShowCreatePopup(false);
-  cargarObras(); // 🔄 recarga la lista
-};
-
 
   const abrirAsignarTecnicos = async (obra: Obra) => {
     setObraSeleccionada(obra);
     setShowAsignarPopup(true);
-
     const { data: asignados, error } = await supabase
       .from("obra_tecnico")
       .select("tecnico_id")
       .eq("obra_id", obra.id);
-
     if (error) console.error("Error técnicos asignados:", error.message);
-
     setSelectedTecnicos(asignados?.map((a) => a.tecnico_id) ?? []);
   };
 
   const handleAsignarTecnicos = async () => {
     if (!obraSeleccionada) return;
-
     await supabase.from("obra_tecnico").delete().eq("obra_id", obraSeleccionada.id);
-
     const rows = selectedTecnicos.map((tecnicoId) => ({
       obra_id: obraSeleccionada.id,
       tecnico_id: tecnicoId,
     }));
-
-    if (rows.length > 0) {
-      await supabase.from("obra_tecnico").insert(rows);
-    }
-
+    if (rows.length > 0) await supabase.from("obra_tecnico").insert(rows);
     setShowAsignarPopup(false);
     setObraSeleccionada(null);
     setSelectedTecnicos([]);
@@ -212,20 +204,23 @@ export default function ObrasPage() {
       </div>
 
       {/* Tabla de obras */}
-      <table className="w-full border border-gray-300 bg-white">
+      <table className="w-full border border-gray-300 bg-white text-sm">
         <thead className="bg-gray-100">
           <tr>
-            <th className="p-2 border">Nombre</th>
-            <th className="p-2 border">Cliente</th>
-            <th className="p-2 border">Estado</th>
-            <th className="p-2 border">Ingreso</th>
-            <th className="p-2 border">Técnicos</th>
-            <th className="p-2 border">Detalle</th>
+            <th className="p-2 border text-left">Obra Nº</th>
+            <th className="p-2 border text-left">Nombre</th>
+            <th className="p-2 border text-left">Estado</th>
+            <th className="p-2 border text-left">Ingreso</th>
+            <th className="p-2 border text-left">Técnicos</th>
+            <th className="p-2 border text-center">Detalle</th>
           </tr>
         </thead>
         <tbody>
           {obras.map((obra) => (
-            <tr key={obra.id}>
+            <tr key={obra.id} className="hover:bg-gray-50">
+              <td className="p-2 border font-medium">
+                {obra.numero_obra ? `Nº ${obra.numero_obra}` : "—"}
+              </td>
               <td className="p-2 border">
                 {editMode ? (
                   <input
@@ -239,17 +234,6 @@ export default function ObrasPage() {
               </td>
               <td className="p-2 border">
                 {editMode ? (
-                  <input
-                    value={editedObras[obra.id]?.cliente ?? obra.cliente ?? ""}
-                    onChange={(e) => handleChange(obra.id, "cliente", e.target.value)}
-                    className="border p-1 w-full"
-                  />
-                ) : (
-                  obra.cliente
-                )}
-              </td>
-              <td className="p-2 border">
-                {editMode ? (
                   <select
                     value={editedObras[obra.id]?.estado ?? obra.estado ?? ""}
                     onChange={(e) => handleChange(obra.id, "estado", e.target.value)}
@@ -257,12 +241,12 @@ export default function ObrasPage() {
                   >
                     {estados.map((est) => (
                       <option key={est} value={est}>
-                        {est}
+                        {est.replace("_", " ")}
                       </option>
                     ))}
                   </select>
                 ) : (
-                  obra.estado
+                  obra.estado?.replace("_", " ")
                 )}
               </td>
               <td className="p-2 border">
@@ -270,7 +254,7 @@ export default function ObrasPage() {
               </td>
               <td className="p-2 border">
                 {obra.tecnicos && obra.tecnicos.length > 0 ? (
-                  <ul className="text-sm space-y-1">
+                  <ul className="text-xs space-y-1">
                     {obra.tecnicos.map((t) => (
                       <li key={t.id}>• {t.nombre} {t.apellido}</li>
                     ))}
@@ -303,10 +287,11 @@ export default function ObrasPage() {
               }}
             >
               <input name="nombre" placeholder="Nombre" className="border p-2 w-full" required />
-              <input name="cliente" placeholder="Cliente" className="border p-2 w-full" />
               <select name="estado" className="border p-2 w-full">
                 {estados.map((est) => (
-                  <option key={est} value={est}>{est}</option>
+                  <option key={est} value={est}>
+                    {est.replace("_", " ")}
+                  </option>
                 ))}
               </select>
               <input name="fecha_ingreso" type="date" className="border p-2 w-full" />
@@ -319,7 +304,10 @@ export default function ObrasPage() {
                 >
                   Cancelar
                 </button>
-                <button type="submit" className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
+                >
                   Guardar
                 </button>
               </div>
@@ -379,9 +367,7 @@ export default function ObrasPage() {
                       <span>{t?.nombre} {t?.apellido}</span>
                       <button
                         onClick={() =>
-                          setSelectedTecnicos((prev) =>
-                            prev.filter((tid) => tid !== id)
-                          )
+                          setSelectedTecnicos((prev) => prev.filter((tid) => tid !== id))
                         }
                         className="text-red-500 hover:text-red-700 text-sm"
                       >

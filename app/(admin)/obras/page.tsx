@@ -51,6 +51,7 @@ export default function ObrasPage() {
   const [filteredTecnicos, setFilteredTecnicos] = useState<Tecnico[]>([]);
   const [selectedTecnicos, setSelectedTecnicos] = useState<string[]>([]);
   const [search, setSearch] = useState("");
+  const [obraAEliminar, setObraAEliminar] = useState<Obra | null>(null);
 
   useEffect(() => {
     cargarObras();
@@ -84,21 +85,6 @@ export default function ObrasPage() {
     setObras(obrasMap);
   };
 
-  const handleSearchTecnico = async (text: string) => {
-    setSearch(text);
-    if (text.length > 1) {
-      const { data, error } = await supabase
-        .from("app_user")
-        .select("id,nombre,apellido")
-        .eq("rol", "tecnico")
-        .ilike("nombre", `%${text}%`);
-      if (error) console.error("Error búsqueda técnicos:", error.message);
-      setFilteredTecnicos((data ?? []) as Tecnico[]);
-    } else {
-      setFilteredTecnicos([]);
-    }
-  };
-
   const handleChange = (id: string, field: keyof Obra, value: string) => {
     setEditedObras((prev) => ({
       ...prev,
@@ -118,6 +104,7 @@ export default function ObrasPage() {
   const handleCreateObra = async (form: Record<string, FormDataEntryValue>) => {
     const nuevaObra = {
       nombre: (form.nombre as string)?.trim(),
+      numero_obra: form.numero_obra ? Number(form.numero_obra) : null,
       estado: (form.estado as string) || "planificada",
       fecha_ingreso: form.fecha_ingreso ? (form.fecha_ingreso as string) : null,
     };
@@ -138,29 +125,22 @@ export default function ObrasPage() {
     cargarObras();
   };
 
-  const abrirAsignarTecnicos = async (obra: Obra) => {
-    setObraSeleccionada(obra);
-    setShowAsignarPopup(true);
-    const { data: asignados, error } = await supabase
-      .from("obra_tecnico")
-      .select("tecnico_id")
-      .eq("obra_id", obra.id);
-    if (error) console.error("Error técnicos asignados:", error.message);
-    setSelectedTecnicos(asignados?.map((a) => a.tecnico_id) ?? []);
-  };
+  // 🧹 Eliminar obra y relaciones
+  const handleEliminarObra = async () => {
+    if (!obraAEliminar) return;
+    try {
+      await supabase.from("obra_tecnico").delete().eq("obra_id", obraAEliminar.id);
+      await supabase.from("plano").delete().eq("obra_id", obraAEliminar.id);
+      await supabase.from("foto").delete().eq("obra_id", obraAEliminar.id);
+      await supabase.from("obra_material").delete().eq("obra_id", obraAEliminar.id);
+      await supabase.from("obra").delete().eq("id", obraAEliminar.id);
 
-  const handleAsignarTecnicos = async () => {
-    if (!obraSeleccionada) return;
-    await supabase.from("obra_tecnico").delete().eq("obra_id", obraSeleccionada.id);
-    const rows = selectedTecnicos.map((tecnicoId) => ({
-      obra_id: obraSeleccionada.id,
-      tecnico_id: tecnicoId,
-    }));
-    if (rows.length > 0) await supabase.from("obra_tecnico").insert(rows);
-    setShowAsignarPopup(false);
-    setObraSeleccionada(null);
-    setSelectedTecnicos([]);
-    cargarObras();
+      setObraAEliminar(null);
+      cargarObras();
+    } catch (err) {
+      console.error("Error eliminando obra:", err);
+      alert("Error eliminando obra");
+    }
   };
 
   return (
@@ -213,6 +193,7 @@ export default function ObrasPage() {
             <th className="p-2 border text-left">Ingreso</th>
             <th className="p-2 border text-left">Técnicos</th>
             <th className="p-2 border text-center">Detalle</th>
+            {editMode && <th className="p-2 border text-center text-red-500">Eliminar</th>}
           </tr>
         </thead>
         <tbody>
@@ -268,12 +249,50 @@ export default function ObrasPage() {
                   ➡️
                 </Link>
               </td>
+              {editMode && (
+                <td className="p-2 border text-center">
+                  <button
+                    onClick={() => setObraAEliminar(obra)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    🗑️
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
       </table>
 
-      {/* Popup Crear Obra */}
+      {/* 🔴 Modal eliminar */}
+      {obraAEliminar && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-[400px] border border-gray-200">
+            <h2 className="text-lg font-semibold mb-3 text-center">
+              ¿Seguro que deseas eliminar esta obra?
+            </h2>
+            <p className="text-sm text-gray-600 text-center mb-4">
+              Esta acción eliminará también los técnicos, fotos y planos vinculados.
+            </p>
+            <div className="flex justify-center gap-3 mt-4">
+              <button
+                onClick={() => setObraAEliminar(null)}
+                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEliminarObra}
+                className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 Popup Crear Obra con campo número */}
       {showCreatePopup && (
         <div className="fixed inset-0 flex items-center justify-center bg-gray-200/40 z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 w-96 border border-gray-200">
@@ -287,6 +306,12 @@ export default function ObrasPage() {
               }}
             >
               <input name="nombre" placeholder="Nombre" className="border p-2 w-full" required />
+              <input
+                name="numero_obra"
+                type="number"
+                placeholder="Número de obra (Ej: 1)"
+                className="border p-2 w-full"
+              />
               <select name="estado" className="border p-2 w-full">
                 {estados.map((est) => (
                   <option key={est} value={est}>
@@ -312,90 +337,6 @@ export default function ObrasPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Popup Asignar Técnicos */}
-      {showAsignarPopup && obraSeleccionada && (
-        <div className="fixed inset-0 flex items-center justify-center bg-gray-200/40 z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-[420px] border border-gray-200 relative">
-            <h2 className="text-lg font-semibold mb-3">
-              Asignar técnicos a {obraSeleccionada.nombre}
-            </h2>
-
-            {/* Buscador */}
-            <div className="relative">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => handleSearchTecnico(e.target.value)}
-                placeholder="Buscar técnico..."
-                className="border p-2 w-full mb-3"
-              />
-
-              {search.length > 1 && filteredTecnicos.length > 0 && (
-                <ul className="absolute left-0 right-0 bg-white border rounded shadow max-h-40 overflow-y-auto z-10">
-                  {filteredTecnicos.map((t) => (
-                    <li
-                      key={t.id}
-                      onClick={() => {
-                        if (!selectedTecnicos.includes(t.id)) {
-                          setSelectedTecnicos((prev) => [...prev, t.id]);
-                        }
-                        setSearch("");
-                        setFilteredTecnicos([]);
-                      }}
-                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                    >
-                      {t.nombre} {t.apellido}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* Técnicos seleccionados */}
-            <div className="mt-3 space-y-1">
-              {selectedTecnicos.length > 0 ? (
-                selectedTecnicos.map((id) => {
-                  const t =
-                    filteredTecnicos.find((ft) => ft.id === id) ||
-                    obraSeleccionada.tecnicos?.find((ot) => ot.id === id);
-                  return (
-                    <div key={id} className="flex items-center justify-between border p-2 rounded">
-                      <span>{t?.nombre} {t?.apellido}</span>
-                      <button
-                        onClick={() =>
-                          setSelectedTecnicos((prev) => prev.filter((tid) => tid !== id))
-                        }
-                        className="text-red-500 hover:text-red-700 text-sm"
-                      >
-                        ❌
-                      </button>
-                    </div>
-                  );
-                })
-              ) : (
-                <span className="text-gray-400 text-sm">Ningún técnico seleccionado</span>
-              )}
-            </div>
-
-            {/* Botones */}
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => setShowAsignarPopup(false)}
-                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleAsignarTecnicos}
-                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                Guardar
-              </button>
-            </div>
           </div>
         </div>
       )}

@@ -26,7 +26,7 @@ const navItems = [
   { href: "/fotos", label: "Fotos", icon: PhotoIcon },
   { href: "/stock", label: "Stock", icon: TruckIcon },
   { href: "/ubicaciones", label: "Ubicaciones", icon: MapIcon },
-  { href: "/asignacionObras", label: "Asignación", icon: HomeIcon },
+  { href: "/asignacionObras", label: "Obra Tecnico", icon: HomeIcon },
   { href: "/perfil", label: "Perfil", icon: UserIcon },
 ];
 
@@ -66,8 +66,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <Image
       src="/images/LogoFio.png"
       alt="Fio Logo"
-      width={140}
-      height={40}
+      width={100}
+      height={100}
       priority
     />
   </Link>

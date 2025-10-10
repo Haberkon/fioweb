@@ -17,6 +17,7 @@ import {
   UserIcon,
   BuildingOfficeIcon,
   TruckIcon,
+  UsersIcon,
 } from "@heroicons/react/24/outline";
 
 const navItems = [
@@ -26,9 +27,10 @@ const navItems = [
   { href: "/fotos", label: "Fotos", icon: PhotoIcon },
   { href: "/stock", label: "Stock", icon: TruckIcon },
   { href: "/ubicaciones", label: "Ubicaciones", icon: MapIcon },
-  { href: "/asignacionObras", label: "Obra Tecnico", icon: HomeIcon },
+  { href: "/asignacionObras", label: "Obra Técnico", icon: HomeIcon },
   { href: "/perfil", label: "Perfil", icon: UserIcon },
-  { href: "/roles", label: "Roles y Perfil", icon: UserIcon },
+  { href: "/admins", label: "Admins", icon: UsersIcon },
+  { href: "/tecnicos", label: "Técnicos", icon: UsersIcon },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -51,46 +53,46 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       >
         {/* Logo + Toggle */}
         <div className="relative flex items-center justify-center pt-3 pb-3 border-b border-gray-700">
-            {collapsed ? (
-  <Link href="/obras">
-    <Image
-      src="/images/LogoFiocamBurger.png"
-      alt="Fio Icon"
-      width={40}
-      height={40}
-      priority
-      className="mx-auto mt-10"  // 👈 agrega ~20 px de margen superior
-    />
-  </Link>
-) : (
-  <Link href="/obras">
-    <Image
-      src="/images/LogoFio.png"
-      alt="Fio Logo"
-      width={100}
-      height={100}
-      priority
-    />
-  </Link>
-)}
-
-          {/* 🔹 Flecha para colapsar/expandir */}
-         <button
-          onClick={() => setCollapsed(!collapsed)}
-          className={`absolute top-3 p-1 rounded hover:bg-gray-800 transition ${
-            collapsed ? "left-1/2 -translate-x-1/2" : "right-3"
-          }`}
-        >
           {collapsed ? (
-            <Bars3Icon className="h-6 w-6 text-gray-300" />
+            <Link href="/obras">
+              <Image
+                src="/images/LogoFiocamBurger.png"
+                alt="Fio Icon"
+                width={40}
+                height={40}
+                priority
+                className="mx-auto mt-10"
+              />
+            </Link>
           ) : (
-            <ChevronLeftIcon className="h-6 w-6 text-gray-300" />
+            <Link href="/obras">
+              <Image
+                src="/images/LogoFio.png"
+                alt="Fio Logo"
+                width={100}
+                height={100}
+                priority
+              />
+            </Link>
           )}
-        </button>
+
+          {/* 🔹 Botón colapsar/expandir */}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className={`absolute top-3 p-1 rounded hover:bg-gray-800 transition ${
+              collapsed ? "left-1/2 -translate-x-1/2" : "right-3"
+            }`}
+          >
+            {collapsed ? (
+              <Bars3Icon className="h-6 w-6 text-gray-300" />
+            ) : (
+              <ChevronLeftIcon className="h-6 w-6 text-gray-300" />
+            )}
+          </button>
         </div>
 
         {/* Navegación */}
-       <nav className="flex-1 overflow-y-auto p-3 space-y-1 mt-9">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1 mt-9">
           {navItems.map(({ href, label, icon: Icon }) => {
             const active = pathname.startsWith(href);
             return (
@@ -128,7 +130,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           collapsed ? "ml-20" : "ml-64"
         }`}
       >
-        {/* ✅ Eliminado el burger duplicado */}
         {children}
       </main>
     </div>

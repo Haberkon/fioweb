@@ -19,53 +19,50 @@ export default function RolesPage() {
   const [tecnicos, setTecnicos] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [editando, setEditando] = useState<Record<string, Partial<Usuario>>>({});
-  const [nuevo, setNuevo] = useState<{
-    tipo: "admin" | "tecnico";
-    data: Partial<Usuario>;
-  }>({
-    tipo: "admin",
-    data: { nombre: "", apellido: "", email: "", dni: "" },
+  const [nuevoAdmin, setNuevoAdmin] = useState<Partial<Usuario>>({
+    nombre: "",
+    apellido: "",
+    email: "",
+  });
+  const [nuevoTecnico, setNuevoTecnico] = useState<Partial<Usuario>>({
+    nombre: "",
+    apellido: "",
+    dni: "",
+    email: "",
   });
   const [creating, setCreating] = useState(false);
 
-  // 📦 Cargar usuarios desde Supabase
+  // 🧠 Cargar usuarios
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      try {
-        const { data: a } = await supabase
-          .from("app_user_admin")
-          .select("id, auth_user_id, nombre, apellido, email");
+      const { data: a } = await supabase
+        .from("app_user_admin")
+        .select("id, auth_user_id, nombre, apellido, email");
+      const { data: t } = await supabase
+        .from("app_user")
+        .select("id, auth_user_id, nombre, apellido, dni, rol");
 
-        const { data: t } = await supabase
-          .from("app_user")
-          .select("id, auth_user_id, nombre, apellido, dni, rol");
-
-        setAdmins(
-          (a ?? []).map((x) => ({
-            ...x,
-            email: x.email ?? "",
-            rol: "admin",
-          }))
-        );
-
-        setTecnicos(
-          (t ?? []).map((x) => ({
-            ...x,
-            email: "",
-            rol: "tecnico",
-          }))
-        );
-      } catch (e) {
-        console.error("Error cargando usuarios", e);
-      } finally {
-        setLoading(false);
-      }
+      setAdmins(
+        (a ?? []).map((x) => ({
+          ...x,
+          email: x.email ?? "",
+          rol: "admin",
+        }))
+      );
+      setTecnicos(
+        (t ?? []).map((x) => ({
+          ...x,
+          email: "",
+          rol: "tecnico",
+        }))
+      );
+      setLoading(false);
     };
     load();
   }, []);
 
-  // ✏️ Editar usuario
+  // ✏️ Editar
   const handleEdit = (id: string, rol: "admin" | "tecnico") => {
     const user =
       rol === "admin"
@@ -87,33 +84,31 @@ export default function RolesPage() {
     setEditando(rest);
   };
 
-  // 💾 Guardar cambios
+  // 💾 Guardar
   const handleSave = async (id: string, rol: "admin" | "tecnico") => {
     const changes: Partial<Usuario> = { ...editando[id] };
     if (!changes) return;
 
-    // 🧹 Evitar actualizar email si no existe columna
     if ("email" in changes) delete (changes as any).email;
-
     const table = rol === "admin" ? "app_user_admin" : "app_user";
     const { error } = await supabase.from(table).update(changes).eq("id", id);
-    if (error) {
-      alert("Error al actualizar: " + error.message);
-      return;
-    }
+
+    if (error) return alert("Error al actualizar: " + error.message);
 
     if (rol === "admin")
       setAdmins((a) => a.map((u) => (u.id === id ? { ...u, ...changes } : u)));
     else
-      setTecnicos((a) => a.map((u) => (u.id === id ? { ...u, ...changes } : u)));
+      setTecnicos((a) =>
+        a.map((u) => (u.id === id ? { ...u, ...changes } : u))
+      );
 
     handleCancel(id);
     alert("✅ Usuario actualizado");
   };
 
-  // 🔒 Cambiar contraseña (API segura)
+  // 🔒 Cambiar pass
   const handleResetPassword = async (auth_user_id: string | null) => {
-    if (!auth_user_id) return alert("Usuario sin ID válido");
+    if (!auth_user_id) return alert("Sin ID de usuario válido");
     const pass = prompt("Nueva contraseña:");
     if (!pass) return;
 
@@ -123,17 +118,18 @@ export default function RolesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ auth_user_id, password: pass }),
       });
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      alert("🔑 Contraseña actualizada correctamente");
+      alert("🔑 Contraseña cambiada correctamente");
     } catch (err: any) {
       alert("Error cambiando contraseña: " + err.message);
     }
   };
 
-  // 🗑️ Eliminar usuario (API segura)
+  // 🗑️ Eliminar
   const handleDelete = async (u: Usuario) => {
-    if (!confirm("¿Seguro que deseas eliminar este usuario?")) return;
+    if (!confirm("¿Eliminar usuario?")) return;
 
     try {
       const res = await fetch("/api/admin/users", {
@@ -158,11 +154,10 @@ export default function RolesPage() {
     }
   };
 
-  // ➕ Crear usuario (API segura)
-  const handleCreate = async (tipo: "admin" | "tecnico") => {
-    const data = nuevo.data;
-    if (!data.email || !data.nombre || !data.apellido) {
-      alert("Completa nombre, apellido y email");
+  // ➕ Crear ADMIN
+  const handleCreateAdmin = async () => {
+    if (!nuevoAdmin.email || !nuevoAdmin.nombre || !nuevoAdmin.apellido) {
+      alert("Completa todos los campos requeridos");
       return;
     }
 
@@ -172,37 +167,28 @@ export default function RolesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: data.email,
+          email: nuevoAdmin.email,
           password: "12345678",
-          nombre: data.nombre,
-          apellido: data.apellido,
-          dni: data.dni,
-          rol: tipo,
+          nombre: nuevoAdmin.nombre,
+          apellido: nuevoAdmin.apellido,
+          rol: "admin",
         }),
       });
 
       const result = await res.json();
       if (!res.ok) throw new Error(result.error);
 
-      alert("✅ Usuario creado correctamente");
-
-      const nuevoUser: Usuario = {
+      const nuevo: Usuario = {
         id: result.userId,
         auth_user_id: result.userId,
-        nombre: data.nombre ?? "",
-        apellido: data.apellido ?? "",
-        dni: data.dni ?? "",
-        email: data.email ?? "",
-        rol: tipo,
+        nombre: nuevoAdmin.nombre ?? "",
+        apellido: nuevoAdmin.apellido ?? "",
+        email: nuevoAdmin.email ?? "",
+        rol: "admin",
       };
-
-      if (tipo === "admin") setAdmins((prev) => [...prev, nuevoUser]);
-      else setTecnicos((prev) => [...prev, nuevoUser]);
-
-      setNuevo({
-        tipo,
-        data: { nombre: "", apellido: "", dni: "", email: "" },
-      });
+      setAdmins((prev) => [...prev, nuevo]);
+      setNuevoAdmin({ nombre: "", apellido: "", email: "" });
+      alert("✅ Administrador creado correctamente");
     } catch (err: any) {
       alert("❌ " + err.message);
     } finally {
@@ -210,7 +196,57 @@ export default function RolesPage() {
     }
   };
 
-  // 🧱 Tabla reutilizable
+  // ➕ Crear TECNICO
+  const handleCreateTecnico = async () => {
+    if (
+      !nuevoTecnico.email ||
+      !nuevoTecnico.nombre ||
+      !nuevoTecnico.apellido
+    ) {
+      alert("Completa todos los campos requeridos");
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: nuevoTecnico.email,
+          password: "12345678",
+          nombre: nuevoTecnico.nombre,
+          apellido: nuevoTecnico.apellido,
+          dni: nuevoTecnico.dni,
+          rol: "tecnico",
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+
+      const nuevo: Usuario = {
+        id: result.userId,
+        auth_user_id: result.userId,
+        nombre: nuevoTecnico.nombre ?? "",
+        apellido: nuevoTecnico.apellido ?? "",
+        dni: nuevoTecnico.dni ?? "",
+        email: nuevoTecnico.email ?? "",
+        rol: "tecnico",
+      };
+      setTecnicos((prev) => [...prev, nuevo]);
+      setNuevoTecnico({ nombre: "", apellido: "", dni: "", email: "" });
+      alert("✅ Técnico creado correctamente");
+    } catch (err: any) {
+      alert("❌ " + err.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (loading) return <div className="p-6 text-gray-600">Cargando...</div>;
+
+  // 🔹 Tabla reutilizable
   const renderTable = (users: Usuario[], color: string) => (
     <table className="min-w-full bg-white rounded shadow">
       <thead className="bg-gray-100">
@@ -295,125 +331,87 @@ export default function RolesPage() {
     </table>
   );
 
-  // 🧩 Render principal
-  if (loading) return <div className="p-6 text-gray-600">Cargando usuarios...</div>;
-
   return (
     <div className="p-6 space-y-10">
-      {/* ===================== ADMINS ===================== */}
+      {/* ADMINS */}
       <section>
-        <h2 className="text-xl font-bold text-red-700 mb-2">
-          Administradores
-        </h2>
+        <h2 className="text-xl font-bold text-red-700 mb-2">Administradores</h2>
         <div className="flex gap-2 mb-3">
           <input
             className="border p-2 rounded w-40"
             placeholder="Nombre"
-            value={nuevo.data.nombre ?? ""}
+            value={nuevoAdmin.nombre ?? ""}
             onChange={(e) =>
-              setNuevo({
-                tipo: "admin",
-                data: { ...nuevo.data, nombre: e.target.value },
-              })
+              setNuevoAdmin({ ...nuevoAdmin, nombre: e.target.value })
             }
           />
           <input
             className="border p-2 rounded w-40"
             placeholder="Apellido"
-            value={nuevo.data.apellido ?? ""}
+            value={nuevoAdmin.apellido ?? ""}
             onChange={(e) =>
-              setNuevo({
-                tipo: "admin",
-                data: { ...nuevo.data, apellido: e.target.value },
-              })
+              setNuevoAdmin({ ...nuevoAdmin, apellido: e.target.value })
             }
           />
           <input
             className="border p-2 rounded w-64"
             placeholder="Email"
-            value={nuevo.data.email ?? ""}
+            value={nuevoAdmin.email ?? ""}
             onChange={(e) =>
-              setNuevo({
-                tipo: "admin",
-                data: { ...nuevo.data, email: e.target.value },
-              })
+              setNuevoAdmin({ ...nuevoAdmin, email: e.target.value })
             }
           />
           <button
-            onClick={() => handleCreate("admin")}
+            onClick={handleCreateAdmin}
             className="bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700"
           >
-            {creating ? (
-              "Creando..."
-            ) : (
-              <>
-                <Plus className="w-4 h-4 inline" /> Crear
-              </>
-            )}
+            {creating ? "Creando..." : <><Plus className="w-4 h-4 inline" /> Crear</>}
           </button>
         </div>
         {renderTable(admins, "red")}
       </section>
 
-      {/* ===================== TECNICOS ===================== */}
+      {/* TECNICOS */}
       <section>
         <h2 className="text-xl font-bold text-blue-700 mb-2">Técnicos</h2>
         <div className="flex gap-2 mb-3">
           <input
             className="border p-2 rounded w-40"
             placeholder="Nombre"
-            value={nuevo.data.nombre ?? ""}
+            value={nuevoTecnico.nombre ?? ""}
             onChange={(e) =>
-              setNuevo({
-                tipo: "tecnico",
-                data: { ...nuevo.data, nombre: e.target.value },
-              })
+              setNuevoTecnico({ ...nuevoTecnico, nombre: e.target.value })
             }
           />
           <input
             className="border p-2 rounded w-40"
             placeholder="Apellido"
-            value={nuevo.data.apellido ?? ""}
+            value={nuevoTecnico.apellido ?? ""}
             onChange={(e) =>
-              setNuevo({
-                tipo: "tecnico",
-                data: { ...nuevo.data, apellido: e.target.value },
-              })
+              setNuevoTecnico({ ...nuevoTecnico, apellido: e.target.value })
             }
           />
           <input
             className="border p-2 rounded w-32"
             placeholder="DNI"
-            value={nuevo.data.dni ?? ""}
+            value={nuevoTecnico.dni ?? ""}
             onChange={(e) =>
-              setNuevo({
-                tipo: "tecnico",
-                data: { ...nuevo.data, dni: e.target.value },
-              })
+              setNuevoTecnico({ ...nuevoTecnico, dni: e.target.value })
             }
           />
           <input
             className="border p-2 rounded w-64"
             placeholder="Email"
-            value={nuevo.data.email ?? ""}
+            value={nuevoTecnico.email ?? ""}
             onChange={(e) =>
-              setNuevo({
-                tipo: "tecnico",
-                data: { ...nuevo.data, email: e.target.value },
-              })
+              setNuevoTecnico({ ...nuevoTecnico, email: e.target.value })
             }
           />
           <button
-            onClick={() => handleCreate("tecnico")}
+            onClick={handleCreateTecnico}
             className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700"
           >
-            {creating ? (
-              "Creando..."
-            ) : (
-              <>
-                <Plus className="w-4 h-4 inline" /> Crear
-              </>
-            )}
+            {creating ? "Creando..." : <><Plus className="w-4 h-4 inline" /> Crear</>}
           </button>
         </div>
         {renderTable(tecnicos, "blue")}

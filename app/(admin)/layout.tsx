@@ -28,6 +28,7 @@ const navItems = [
   { href: "/ubicaciones", label: "Ubicaciones", icon: MapIcon },
   { href: "/asignacionObras", label: "Obra Tecnico", icon: HomeIcon },
   { href: "/perfil", label: "Perfil", icon: UserIcon },
+  { href: "/roles", label: "Roles y Perfil", icon: UserIcon },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

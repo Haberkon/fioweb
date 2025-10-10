@@ -3,6 +3,14 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
+import {
+  Plus,
+  Edit3,
+  Save,
+  X,
+  Trash2,
+  Eye,
+} from "lucide-react"; // 🔹 Iconos modernos Lucide
 
 type Tecnico = {
   id: string;
@@ -46,11 +54,6 @@ export default function ObrasPage() {
   const [editMode, setEditMode] = useState(false);
   const [editedObras, setEditedObras] = useState<Record<string, Partial<Obra>>>({});
   const [showCreatePopup, setShowCreatePopup] = useState(false);
-  const [showAsignarPopup, setShowAsignarPopup] = useState(false);
-  const [obraSeleccionada, setObraSeleccionada] = useState<Obra | null>(null);
-  const [filteredTecnicos, setFilteredTecnicos] = useState<Tecnico[]>([]);
-  const [selectedTecnicos, setSelectedTecnicos] = useState<string[]>([]);
-  const [search, setSearch] = useState("");
   const [obraAEliminar, setObraAEliminar] = useState<Obra | null>(null);
 
   useEffect(() => {
@@ -74,13 +77,12 @@ export default function ObrasPage() {
       return;
     }
 
-    const obrasMap: Obra[] =
-      ((data as unknown) as ObraRow[] ?? []).map((o) => ({
-        ...o,
-        tecnicos: (o.obra_tecnico ?? [])
-          .map((ot) => ot.app_user)
-          .filter((u): u is Tecnico => u !== null),
-      }));
+    const obrasMap: Obra[] = ((data as unknown) as ObraRow[] ?? []).map((o) => ({
+      ...o,
+      tecnicos: (o.obra_tecnico ?? [])
+        .map((ot) => ot.app_user)
+        .filter((u): u is Tecnico => u !== null),
+    }));
 
     setObras(obrasMap);
   };
@@ -125,7 +127,6 @@ export default function ObrasPage() {
     cargarObras();
   };
 
-  // 🧹 Eliminar obra y relaciones
   const handleEliminarObra = async () => {
     if (!obraAEliminar) return;
     try {
@@ -144,135 +145,153 @@ export default function ObrasPage() {
   };
 
   return (
-    <div className="p-6 relative">
-      {/* Botones superiores */}
-      <div className="flex justify-end gap-3 mb-4">
-        {!editMode ? (
-          <>
-            <button
-              onClick={() => setShowCreatePopup(true)}
-              className="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 border"
-            >
-              ➕ Crear obra
-            </button>
-            <button
-              onClick={() => setEditMode(true)}
-              className="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 border"
-            >
-              ✏️ Editar obras
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={() => {
-                setEditMode(false);
-                setEditedObras({});
-              }}
-              className="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 border"
-            >
-              ❌ Cancelar
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              💾 Guardar
-            </button>
-          </>
-        )}
+    <div className="p-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Gestión de Obras</h1>
+
+        <div className="flex gap-3">
+          {!editMode ? (
+            <>
+              <button
+                onClick={() => setShowCreatePopup(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+              >
+                <Plus size={18} /> Nueva Obra
+              </button>
+              <button
+                onClick={() => setEditMode(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md border transition"
+              >
+                <Edit3 size={18} /> Editar
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => {
+                  setEditMode(false);
+                  setEditedObras({});
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md border transition"
+              >
+                <X size={18} /> Cancelar
+              </button>
+              <button
+                onClick={handleSave}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition"
+              >
+                <Save size={18} /> Guardar
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Tabla de obras */}
-      <table className="w-full border border-gray-300 bg-white text-sm">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="p-2 border text-left">Obra Nº</th>
-            <th className="p-2 border text-left">Nombre</th>
-            <th className="p-2 border text-left">Estado</th>
-            <th className="p-2 border text-left">Ingreso</th>
-            <th className="p-2 border text-left">Técnicos</th>
-            <th className="p-2 border text-center">Detalle</th>
-            {editMode && <th className="p-2 border text-center text-red-500">Eliminar</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {obras.map((obra) => (
-            <tr key={obra.id} className="hover:bg-gray-50">
-              <td className="p-2 border font-medium">
-                {obra.numero_obra ? `Nº ${obra.numero_obra}` : "—"}
-              </td>
-              <td className="p-2 border">
-                {editMode ? (
-                  <input
-                    value={editedObras[obra.id]?.nombre ?? obra.nombre}
-                    onChange={(e) => handleChange(obra.id, "nombre", e.target.value)}
-                    className="border p-1 w-full"
-                  />
-                ) : (
-                  obra.nombre
-                )}
-              </td>
-              <td className="p-2 border">
-                {editMode ? (
-                  <select
-                    value={editedObras[obra.id]?.estado ?? obra.estado ?? ""}
-                    onChange={(e) => handleChange(obra.id, "estado", e.target.value)}
-                    className="border p-1 w-full"
-                  >
-                    {estados.map((est) => (
-                      <option key={est} value={est}>
-                        {est.replace("_", " ")}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  obra.estado?.replace("_", " ")
-                )}
-              </td>
-              <td className="p-2 border">
-                {obra.fecha_ingreso ?? obra.created_at?.substring(0, 10)}
-              </td>
-              <td className="p-2 border">
-                {obra.tecnicos && obra.tecnicos.length > 0 ? (
-                  <ul className="text-xs space-y-1">
-                    {obra.tecnicos.map((t) => (
-                      <li key={t.id}>• {t.nombre} {t.apellido}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <span className="text-gray-400">Sin técnicos</span>
-                )}
-              </td>
-              <td className="p-2 border text-center">
-                <Link href={`/obras/${obra.id}`} className="text-blue-600 hover:underline">
-                  ➡️
-                </Link>
-              </td>
+      <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+        <table className="w-full text-sm text-gray-700">
+          <thead className="bg-gray-100 text-gray-800 uppercase text-xs font-semibold">
+            <tr>
+              <th className="px-4 py-2 text-left">Obra Nº</th>
+              <th className="px-4 py-2 text-left">Nombre</th>
+              <th className="px-4 py-2 text-left">Estado</th>
+              <th className="px-4 py-2 text-left">Ingreso</th>
+              <th className="px-4 py-2 text-left">Técnicos</th>
+              <th className="px-4 py-2 text-center">Detalle</th>
               {editMode && (
-                <td className="p-2 border text-center">
-                  <button
-                    onClick={() => setObraAEliminar(obra)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    🗑️
-                  </button>
-                </td>
+                <th className="px-4 py-2 text-center text-red-600">Eliminar</th>
               )}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {obras.map((obra, i) => (
+              <tr
+                key={obra.id}
+                className={`${
+                  i % 2 === 0 ? "bg-white" : "bg-gray-50"
+                } hover:bg-blue-50 transition`}
+              >
+                <td className="px-4 py-2 font-medium">
+                  {obra.numero_obra ? `Nº ${obra.numero_obra}` : "—"}
+                </td>
+                <td className="px-4 py-2">
+                  {editMode ? (
+                    <input
+                      value={editedObras[obra.id]?.nombre ?? obra.nombre}
+                      onChange={(e) =>
+                        handleChange(obra.id, "nombre", e.target.value)
+                      }
+                      className="border rounded-md p-1 w-full"
+                    />
+                  ) : (
+                    obra.nombre
+                  )}
+                </td>
+                <td className="px-4 py-2">
+                  {editMode ? (
+                    <select
+                      value={editedObras[obra.id]?.estado ?? obra.estado ?? ""}
+                      onChange={(e) =>
+                        handleChange(obra.id, "estado", e.target.value)
+                      }
+                      className="border rounded-md p-1 w-full"
+                    >
+                      {estados.map((est) => (
+                        <option key={est} value={est}>
+                          {est.replace("_", " ")}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="capitalize">{obra.estado ?? "—"}</span>
+                  )}
+                </td>
+                <td className="px-4 py-2">
+                  {obra.fecha_ingreso ?? obra.created_at?.substring(0, 10)}
+                </td>
+                <td className="px-4 py-2">
+                  {obra.tecnicos && obra.tecnicos.length > 0 ? (
+                    <ul className="text-xs space-y-1">
+                      {obra.tecnicos.map((t) => (
+                        <li key={t.id}>• {t.nombre} {t.apellido}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className="text-gray-400">Sin técnicos</span>
+                  )}
+                </td>
+                <td className="px-4 py-2 text-center">
+                  <Link
+                    href={`/obras/${obra.id}`}
+                    className="text-blue-600 hover:text-blue-800 transition"
+                  >
+                    <Eye size={18} />
+                  </Link>
+                </td>
+                {editMode && (
+                  <td className="px-4 py-2 text-center">
+                    <button
+                      onClick={() => setObraAEliminar(obra)}
+                      className="text-red-600 hover:text-red-800 transition"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      {/* 🔴 Modal eliminar */}
+      {/* Modal eliminar */}
       {obraAEliminar && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 w-[400px] border border-gray-200">
             <h2 className="text-lg font-semibold mb-3 text-center">
-              ¿Seguro que deseas eliminar esta obra?
+              ¿Eliminar esta obra?
             </h2>
             <p className="text-sm text-gray-600 text-center mb-4">
-              Esta acción eliminará también los técnicos, fotos y planos vinculados.
+              Se eliminarán también los técnicos, fotos y planos asociados.
             </p>
             <div className="flex justify-center gap-3 mt-4">
               <button
@@ -292,9 +311,9 @@ export default function ObrasPage() {
         </div>
       )}
 
-      {/* 🆕 Popup Crear Obra con campo número */}
+      {/* Modal crear obra */}
       {showCreatePopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-gray-200/40 z-50">
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-200/50 z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 w-96 border border-gray-200">
             <h2 className="text-lg font-semibold mb-4">Crear nueva obra</h2>
             <form
@@ -305,22 +324,33 @@ export default function ObrasPage() {
                 await handleCreateObra(form);
               }}
             >
-              <input name="nombre" placeholder="Nombre" className="border p-2 w-full" required />
+              <input
+                name="nombre"
+                placeholder="Nombre"
+                className="border p-2 w-full rounded-md"
+                required
+              />
               <input
                 name="numero_obra"
                 type="number"
                 placeholder="Número de obra (Ej: 1)"
-                className="border p-2 w-full"
+                className="border p-2 w-full rounded-md"
               />
-              <select name="estado" className="border p-2 w-full">
+              <select
+                name="estado"
+                className="border p-2 w-full rounded-md"
+              >
                 {estados.map((est) => (
                   <option key={est} value={est}>
                     {est.replace("_", " ")}
                   </option>
                 ))}
               </select>
-              <input name="fecha_ingreso" type="date" className="border p-2 w-full" />
-
+              <input
+                name="fecha_ingreso"
+                type="date"
+                className="border p-2 w-full rounded-md"
+              />
               <div className="flex justify-end gap-2 mt-4">
                 <button
                   type="button"
@@ -333,7 +363,7 @@ export default function ObrasPage() {
                   type="submit"
                   className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  Guardar
+                  Crear
                 </button>
               </div>
             </form>

@@ -20,23 +20,28 @@ export default function TecnicosPage() {
   const [editando, setEditando] = useState<Record<string, Partial<Tecnico>>>({});
   const [creating, setCreating] = useState(false);
 
-  // 🔒 Modal states
+  // Modales
   const [showModal, setShowModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Creación
   const [nuevoTecnico, setNuevoTecnico] = useState<Partial<Tecnico>>({
     nombre: "",
     apellido: "",
     dni: "",
     email: "",
   });
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCreatePass, setShowCreatePass] = useState(false);
 
+  // Cambio de contraseña
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [currentPass, setCurrentPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
   const [showPass, setShowPass] = useState(false);
 
-  // 📦 Cargar técnicos (desde API segura)
+  // Cargar técnicos
   useEffect(() => {
     const load = async () => {
       try {
@@ -54,11 +59,10 @@ export default function TecnicosPage() {
     load();
   }, []);
 
-  // ✏️ Editar
+  // Editar y guardar
   const handleEdit = (id: string) => {
     const user = tecnicos.find((t) => t.id === id);
-    if (!user) return;
-    setEditando((prev) => ({ ...prev, [id]: user }));
+    if (user) setEditando((prev) => ({ ...prev, [id]: user }));
   };
 
   const handleChange = (id: string, field: keyof Tecnico, value: string) => {
@@ -73,9 +77,8 @@ export default function TecnicosPage() {
     setEditando(rest);
   };
 
-  // 💾 Guardar cambios
   const handleSave = async (id: string) => {
-    const changes: Partial<Tecnico> = { ...editando[id] };
+    const changes = editando[id];
     if (!changes) return;
     delete (changes as any).email;
 
@@ -87,17 +90,72 @@ export default function TecnicosPage() {
     alert("✅ Técnico actualizado");
   };
 
-  // 🔒 Abrir modal para cambiar contraseña
+  // Crear técnico
+  const handleCreateTecnico = async () => {
+    if (
+      !nuevoTecnico.email ||
+      !nuevoTecnico.nombre ||
+      !nuevoTecnico.apellido ||
+      !newPassword ||
+      !confirmPassword
+    ) {
+      alert("Completa todos los campos requeridos");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      alert("Las contraseñas no coinciden");
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: nuevoTecnico.email,
+          password: newPassword,
+          nombre: nuevoTecnico.nombre,
+          apellido: nuevoTecnico.apellido,
+          dni: nuevoTecnico.dni,
+          rol: "tecnico",
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+
+      const nuevo: Tecnico = {
+        id: result.userId,
+        auth_user_id: result.userId,
+        nombre: nuevoTecnico.nombre ?? "",
+        apellido: nuevoTecnico.apellido ?? "",
+        dni: nuevoTecnico.dni ?? "",
+        email: nuevoTecnico.email ?? "",
+        rol: "tecnico",
+      };
+      setTecnicos((prev) => [...prev, nuevo]);
+      setNuevoTecnico({ nombre: "", apellido: "", dni: "", email: "" });
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowCreateModal(false);
+      alert("✅ Técnico creado correctamente");
+    } catch (err: any) {
+      alert("❌ " + err.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // Cambiar contraseña existente
   const handleResetPassword = (auth_user_id: string | null) => {
     if (!auth_user_id) return alert("Usuario inválido");
     setSelectedUserId(auth_user_id);
-    setCurrentPass("");
     setNewPass("");
     setConfirmPass("");
     setShowModal(true);
   };
 
-  // 🔑 Confirmar cambio de contraseña
   const handleConfirmPasswordChange = async () => {
     if (!selectedUserId) return;
     if (!newPass || !confirmPass) return alert("Completá todos los campos.");
@@ -109,10 +167,8 @@ export default function TecnicosPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ auth_user_id: selectedUserId, password: newPass }),
       });
-
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al cambiar contraseña");
-
+      if (!res.ok) throw new Error(data.error);
       alert("✅ Contraseña cambiada correctamente");
       setShowModal(false);
     } catch (err: any) {
@@ -120,10 +176,9 @@ export default function TecnicosPage() {
     }
   };
 
-  // 🗑️ Eliminar técnico
+  // Eliminar
   const handleDelete = async (u: Tecnico) => {
     if (!confirm("¿Eliminar técnico?")) return;
-
     try {
       const res = await fetch("/api/users", {
         method: "DELETE",
@@ -136,57 +191,10 @@ export default function TecnicosPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-
       setTecnicos((prev) => prev.filter((a) => a.id !== u.id));
       alert("🗑️ Técnico eliminado correctamente");
     } catch (err: any) {
       alert("Error eliminando usuario: " + err.message);
-    }
-  };
-
-  // ➕ Crear nuevo técnico (vía modal)
-  const handleCreateTecnico = async () => {
-    if (!nuevoTecnico.email || !nuevoTecnico.nombre || !nuevoTecnico.apellido) {
-      alert("Completa todos los campos requeridos");
-      return;
-    }
-
-    setCreating(true);
-    try {
-      const res = await fetch("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: nuevoTecnico.email,
-          password: "12345678",
-          nombre: nuevoTecnico.nombre,
-          apellido: nuevoTecnico.apellido,
-          dni: nuevoTecnico.dni,
-          rol: "tecnico",
-        }),
-      });
-
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error);
-
-      // Agregar al estado local
-      const nuevo: Tecnico = {
-        id: result.userId,
-        auth_user_id: result.userId,
-        nombre: nuevoTecnico.nombre ?? "",
-        apellido: nuevoTecnico.apellido ?? "",
-        dni: nuevoTecnico.dni ?? "",
-        email: nuevoTecnico.email ?? "",
-        rol: "tecnico",
-      };
-      setTecnicos((prev) => [...prev, nuevo]);
-      setNuevoTecnico({ nombre: "", apellido: "", dni: "", email: "" });
-      setShowCreateModal(false);
-      alert("✅ Técnico creado correctamente");
-    } catch (err: any) {
-      alert("❌ " + err.message);
-    } finally {
-      setCreating(false);
     }
   };
 
@@ -204,7 +212,7 @@ export default function TecnicosPage() {
         </button>
       </div>
 
-      {/* Tabla de técnicos */}
+      {/* Tabla */}
       <table className="min-w-full bg-white rounded shadow">
         <thead className="bg-gray-100">
           <tr>
@@ -275,107 +283,6 @@ export default function TecnicosPage() {
         </tbody>
       </table>
 
-      {/* 🔒 Modal Cambiar Contraseña */}
-      {showModal && (
-        <div
-          className="fixed inset-0 flex items-center justify-center z-50"
-          style={{ backgroundColor: "rgba(0,0,0,0.2)" }}
-        >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5 border border-gray-200 relative">
-            <h2 className="text-lg font-semibold text-gray-800 mb-3">
-              Cambiar Contraseña
-            </h2>
-
-            {/* Contraseña actual (informativa) */}
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
-                Contraseña actual
-              </label>
-              <div className="relative">
-                <input
-                  type="password"
-                  value="********"
-                  readOnly
-                  className="w-full border p-2 rounded mt-1 bg-gray-50 text-gray-500 cursor-not-allowed"
-                />
-                <button
-                  type="button"
-                  disabled
-                  className="absolute right-3 top-3 text-gray-300 cursor-not-allowed"
-                >
-                  <EyeOff size={18} />
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                (Por seguridad, la contraseña actual no puede mostrarse)
-              </p>
-            </div>
-
-            {/* Nueva contraseña */}
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
-                Nueva contraseña
-              </label>
-              <div className="relative">
-                <input
-                  type={showPass ? "text" : "password"}
-                  value={newPass}
-                  onChange={(e) => setNewPass(e.target.value)}
-                  placeholder="Nueva contraseña"
-                  className="w-full border p-2 rounded mt-1 focus:ring-2 focus:ring-blue-200 outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass((p) => !p)}
-                  className="absolute right-3 top-3 text-gray-500 hover:text-gray-700"
-                >
-                  {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            {/* Confirmar nueva contraseña */}
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
-                Confirmar nueva contraseña
-              </label>
-              <div className="relative">
-                <input
-                  type={showPass ? "text" : "password"}
-                  value={confirmPass}
-                  onChange={(e) => setConfirmPass(e.target.value)}
-                  placeholder="Confirmar contraseña"
-                  className="w-full border p-2 rounded mt-1 focus:ring-2 focus:ring-blue-200 outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass((p) => !p)}
-                  className="absolute right-3 top-3 text-gray-500 hover:text-gray-700"
-                >
-                  {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            {/* Botones */}
-            <div className="flex justify-end gap-2 pt-3">
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 rounded border border-gray-400 text-gray-600 hover:bg-gray-100 transition"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmPasswordChange}
-                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition"
-              >
-                Aceptar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ➕ Modal Crear Técnico */}
       {showCreateModal && (
         <div
@@ -420,6 +327,42 @@ export default function TecnicosPage() {
                   setNuevoTecnico({ ...nuevoTecnico, email: e.target.value })
                 }
               />
+
+              {/* Contraseña */}
+              <div className="col-span-2 relative">
+                <input
+                  type={showCreatePass ? "text" : "password"}
+                  className="border p-2 rounded w-full"
+                  placeholder="Contraseña inicial"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePass((p) => !p)}
+                  className="absolute right-3 top-3 text-gray-500 hover:text-gray-700"
+                >
+                  {showCreatePass ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+
+              {/* Confirmar contraseña */}
+              <div className="col-span-2 relative">
+                <input
+                  type={showCreatePass ? "text" : "password"}
+                  className="border p-2 rounded w-full"
+                  placeholder="Confirmar contraseña"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePass((p) => !p)}
+                  className="absolute right-3 top-3 text-gray-500 hover:text-gray-700"
+                >
+                  {showCreatePass ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-3">

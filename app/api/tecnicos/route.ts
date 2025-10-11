@@ -1,40 +1,32 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // 👈 usa la service key (solo en servidor)
-);
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export async function GET() {
   try {
-    // 1️⃣ Traer técnicos desde app_user
-    const { data: tecnicos, error: error1 } = await supabaseAdmin
+    // 1️⃣ Obtener técnicos de la tabla app_user
+    const { data: tecnicos, error } = await supabaseAdmin
       .from("app_user")
-      .select("id, auth_user_id, nombre, apellido, dni, rol")
-      .eq("rol", "tecnico");
+      .select("id, auth_user_id, nombre, apellido, dni, rol");
 
-    if (error1) throw error1;
+    if (error) throw error;
+    if (!tecnicos) return NextResponse.json([]);
 
-    // 2️⃣ Traer todos los usuarios Auth
-    const { data: users, error: error2 } = await supabaseAdmin.auth.admin.listUsers();
-    if (error2) throw error2;
+    // 2️⃣ Obtener lista de usuarios Auth
+    const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers();
+    if (authError) throw authError;
 
-    // 3️⃣ Mapear emails
-    const emailMap = new Map<string, string>();
-    users.users.forEach((u) => {
-      emailMap.set(u.id, u.email ?? "");
+    // 3️⃣ Vincular email con cada técnico
+    const enriched = tecnicos.map((t) => {
+      const found = authUsers.users.find((u) => u.id === t.auth_user_id);
+      return {
+        ...t,
+        email: found?.email ?? "—",
+      };
     });
 
-    // 4️⃣ Unir datos
-    const result = tecnicos.map((t) => ({
-      ...t,
-      email: emailMap.get(t.auth_user_id ?? "") ?? "",
-    }));
-
-    return NextResponse.json(result);
+    return NextResponse.json(enriched);
   } catch (err: any) {
-    console.error("Error en /api/tecnicos:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Error cargando técnicos:", err.message);
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }

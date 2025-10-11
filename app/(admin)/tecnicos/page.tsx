@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { Edit3, Trash2, Save, X, Plus, Lock } from "lucide-react";
+import { Edit3, Trash2, Save, X, Plus, Lock, Eye, EyeOff } from "lucide-react";
 
 type Tecnico = {
   id: string;
@@ -18,16 +18,18 @@ export default function TecnicosPage() {
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [loading, setLoading] = useState(true);
   const [editando, setEditando] = useState<Record<string, Partial<Tecnico>>>({});
+  const [creating, setCreating] = useState(false);
+
+  // 🔒 Modal states
+  const [showModal, setShowModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [nuevoTecnico, setNuevoTecnico] = useState<Partial<Tecnico>>({
     nombre: "",
     apellido: "",
     dni: "",
     email: "",
   });
-  const [creating, setCreating] = useState(false);
 
-  // 🔒 Modal states
-  const [showModal, setShowModal] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [currentPass, setCurrentPass] = useState("");
   const [newPass, setNewPass] = useState("");
@@ -75,14 +77,9 @@ export default function TecnicosPage() {
   const handleSave = async (id: string) => {
     const changes: Partial<Tecnico> = { ...editando[id] };
     if (!changes) return;
-
     delete (changes as any).email;
 
-    const { error } = await supabase
-      .from("app_user")
-      .update(changes)
-      .eq("id", id);
-
+    const { error } = await supabase.from("app_user").update(changes).eq("id", id);
     if (error) return alert("Error al actualizar: " + error.message);
 
     setTecnicos((a) => a.map((u) => (u.id === id ? { ...u, ...changes } : u)));
@@ -103,15 +100,11 @@ export default function TecnicosPage() {
   // 🔑 Confirmar cambio de contraseña
   const handleConfirmPasswordChange = async () => {
     if (!selectedUserId) return;
-
-    if (!newPass || !confirmPass)
-      return alert("Completá todos los campos.");
-
-    if (newPass !== confirmPass)
-      return alert("Las contraseñas no coinciden.");
+    if (!newPass || !confirmPass) return alert("Completá todos los campos.");
+    if (newPass !== confirmPass) return alert("Las contraseñas no coinciden.");
 
     try {
-      const res = await fetch("/api/change-password", {
+      const res = await fetch("/api/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ auth_user_id: selectedUserId, password: newPass }),
@@ -132,7 +125,7 @@ export default function TecnicosPage() {
     if (!confirm("¿Eliminar técnico?")) return;
 
     try {
-      const res = await fetch("/api/admin/users", {
+      const res = await fetch("/api/users", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -151,7 +144,7 @@ export default function TecnicosPage() {
     }
   };
 
-  // ➕ Crear nuevo técnico
+  // ➕ Crear nuevo técnico (vía modal)
   const handleCreateTecnico = async () => {
     if (!nuevoTecnico.email || !nuevoTecnico.nombre || !nuevoTecnico.apellido) {
       alert("Completa todos los campos requeridos");
@@ -160,7 +153,7 @@ export default function TecnicosPage() {
 
     setCreating(true);
     try {
-      const res = await fetch("/api/admin/users", {
+      const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -176,6 +169,7 @@ export default function TecnicosPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error);
 
+      // Agregar al estado local
       const nuevo: Tecnico = {
         id: result.userId,
         auth_user_id: result.userId,
@@ -187,6 +181,7 @@ export default function TecnicosPage() {
       };
       setTecnicos((prev) => [...prev, nuevo]);
       setNuevoTecnico({ nombre: "", apellido: "", dni: "", email: "" });
+      setShowCreateModal(false);
       alert("✅ Técnico creado correctamente");
     } catch (err: any) {
       alert("❌ " + err.message);
@@ -199,49 +194,17 @@ export default function TecnicosPage() {
 
   return (
     <div className="p-6 space-y-10">
-      <h2 className="text-xl font-bold text-blue-700 mb-2">Técnicos</h2>
-
-      <div className="flex gap-2 mb-3">
-        <input
-          className="border p-2 rounded w-40"
-          placeholder="Nombre"
-          value={nuevoTecnico.nombre ?? ""}
-          onChange={(e) =>
-            setNuevoTecnico({ ...nuevoTecnico, nombre: e.target.value })
-          }
-        />
-        <input
-          className="border p-2 rounded w-40"
-          placeholder="Apellido"
-          value={nuevoTecnico.apellido ?? ""}
-          onChange={(e) =>
-            setNuevoTecnico({ ...nuevoTecnico, apellido: e.target.value })
-          }
-        />
-        <input
-          className="border p-2 rounded w-32"
-          placeholder="DNI"
-          value={nuevoTecnico.dni ?? ""}
-          onChange={(e) =>
-            setNuevoTecnico({ ...nuevoTecnico, dni: e.target.value })
-          }
-        />
-        <input
-          className="border p-2 rounded w-64"
-          placeholder="Email"
-          value={nuevoTecnico.email ?? ""}
-          onChange={(e) =>
-            setNuevoTecnico({ ...nuevoTecnico, email: e.target.value })
-          }
-        />
+      <div className="flex justify-between items-center mb-3">
+        <h2 className="text-xl font-bold text-blue-700">Técnicos</h2>
         <button
-          onClick={handleCreateTecnico}
-          className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700"
+          onClick={() => setShowCreateModal(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2"
         >
-          {creating ? "Creando..." : <><Plus className="w-4 h-4 inline" /> Crear</>}
+          <Plus className="w-4 h-4" /> Crear Técnico
         </button>
       </div>
 
+      {/* Tabla de técnicos */}
       <table className="min-w-full bg-white rounded shadow">
         <thead className="bg-gray-100">
           <tr>
@@ -261,27 +224,21 @@ export default function TecnicosPage() {
                     <input
                       className="border p-1 rounded w-full"
                       value={editando[u.id].nombre ?? ""}
-                      onChange={(e) =>
-                        handleChange(u.id, "nombre", e.target.value)
-                      }
+                      onChange={(e) => handleChange(u.id, "nombre", e.target.value)}
                     />
                   </td>
                   <td className="px-3 py-2">
                     <input
                       className="border p-1 rounded w-full"
                       value={editando[u.id].apellido ?? ""}
-                      onChange={(e) =>
-                        handleChange(u.id, "apellido", e.target.value)
-                      }
+                      onChange={(e) => handleChange(u.id, "apellido", e.target.value)}
                     />
                   </td>
                   <td className="px-3 py-2">
                     <input
                       className="border p-1 rounded w-full"
                       value={editando[u.id].dni ?? ""}
-                      onChange={(e) =>
-                        handleChange(u.id, "dni", e.target.value)
-                      }
+                      onChange={(e) => handleChange(u.id, "dni", e.target.value)}
                     />
                   </td>
                   <td className="px-3 py-2">{u.email}</td>
@@ -320,72 +277,164 @@ export default function TecnicosPage() {
 
       {/* 🔒 Modal Cambiar Contraseña */}
       {showModal && (
-<div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: "rgba(0,0,0,0.2)" }}>
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 space-y-4 pointer-events-auto">
-            <h2 className="text-lg font-semibold text-gray-800">
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50"
+          style={{ backgroundColor: "rgba(0,0,0,0.2)" }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5 border border-gray-200 relative">
+            <h2 className="text-lg font-semibold text-gray-800 mb-3">
               Cambiar Contraseña
             </h2>
 
+            {/* Contraseña actual (informativa) */}
             <div>
-              <label className="block text-sm font-medium text-gray-600">
+              <label className="block text-sm font-medium text-gray-600 mb-1">
                 Contraseña actual
               </label>
               <div className="relative">
                 <input
+                  type="password"
+                  value="********"
+                  readOnly
+                  className="w-full border p-2 rounded mt-1 bg-gray-50 text-gray-500 cursor-not-allowed"
+                />
+                <button
+                  type="button"
+                  disabled
+                  className="absolute right-3 top-3 text-gray-300 cursor-not-allowed"
+                >
+                  <EyeOff size={18} />
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                (Por seguridad, la contraseña actual no puede mostrarse)
+              </p>
+            </div>
+
+            {/* Nueva contraseña */}
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">
+                Nueva contraseña
+              </label>
+              <div className="relative">
+                <input
                   type={showPass ? "text" : "password"}
-                  value={currentPass}
-                  onChange={(e) => setCurrentPass(e.target.value)}
-                  placeholder="Contraseña actual"
-                  className="w-full border p-2 rounded mt-1"
+                  value={newPass}
+                  onChange={(e) => setNewPass(e.target.value)}
+                  placeholder="Nueva contraseña"
+                  className="w-full border p-2 rounded mt-1 focus:ring-2 focus:ring-blue-200 outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass((p) => !p)}
-                  className="absolute right-3 top-3 text-gray-500"
+                  className="absolute right-3 top-3 text-gray-500 hover:text-gray-700"
                 >
-                  {showPass ? "🙈" : "👁️"}
+                  {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
 
+            {/* Confirmar nueva contraseña */}
             <div>
-              <label className="block text-sm font-medium text-gray-600">
-                Nueva contraseña
-              </label>
-              <input
-                type="password"
-                value={newPass}
-                onChange={(e) => setNewPass(e.target.value)}
-                placeholder="Nueva contraseña"
-                className="w-full border p-2 rounded mt-1"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-600">
+              <label className="block text-sm font-medium text-gray-600 mb-1">
                 Confirmar nueva contraseña
               </label>
-              <input
-                type="password"
-                value={confirmPass}
-                onChange={(e) => setConfirmPass(e.target.value)}
-                placeholder="Confirmar contraseña"
-                className="w-full border p-2 rounded mt-1"
-              />
+              <div className="relative">
+                <input
+                  type={showPass ? "text" : "password"}
+                  value={confirmPass}
+                  onChange={(e) => setConfirmPass(e.target.value)}
+                  placeholder="Confirmar contraseña"
+                  className="w-full border p-2 rounded mt-1 focus:ring-2 focus:ring-blue-200 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass((p) => !p)}
+                  className="absolute right-3 top-3 text-gray-500 hover:text-gray-700"
+                >
+                  {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
+            {/* Botones */}
             <div className="flex justify-end gap-2 pt-3">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 rounded border border-gray-400 text-gray-600 hover:bg-gray-100"
+                className="px-4 py-2 rounded border border-gray-400 text-gray-600 hover:bg-gray-100 transition"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleConfirmPasswordChange}
-                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition"
               >
                 Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ➕ Modal Crear Técnico */}
+      {showCreateModal && (
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50"
+          style={{ backgroundColor: "rgba(0,0,0,0.2)" }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-5 border border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-800 mb-3">
+              Crear Nuevo Técnico
+            </h2>
+
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                className="border p-2 rounded"
+                placeholder="Nombre"
+                value={nuevoTecnico.nombre ?? ""}
+                onChange={(e) =>
+                  setNuevoTecnico({ ...nuevoTecnico, nombre: e.target.value })
+                }
+              />
+              <input
+                className="border p-2 rounded"
+                placeholder="Apellido"
+                value={nuevoTecnico.apellido ?? ""}
+                onChange={(e) =>
+                  setNuevoTecnico({ ...nuevoTecnico, apellido: e.target.value })
+                }
+              />
+              <input
+                className="border p-2 rounded"
+                placeholder="DNI"
+                value={nuevoTecnico.dni ?? ""}
+                onChange={(e) =>
+                  setNuevoTecnico({ ...nuevoTecnico, dni: e.target.value })
+                }
+              />
+              <input
+                className="border p-2 rounded col-span-2"
+                placeholder="Email"
+                value={nuevoTecnico.email ?? ""}
+                onChange={(e) =>
+                  setNuevoTecnico({ ...nuevoTecnico, email: e.target.value })
+                }
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 rounded border border-gray-400 text-gray-600 hover:bg-gray-100 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateTecnico}
+                disabled={creating}
+                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-60"
+              >
+                {creating ? "Creando..." : "Crear"}
               </button>
             </div>
           </div>

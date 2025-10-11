@@ -27,6 +27,7 @@ const navItems = [
   { href: "/fotos", label: "Fotos", icon: PhotoIcon },
   { href: "/stock", label: "Stock", icon: TruckIcon },
   { href: "/ubicaciones", label: "Ubicaciones", icon: MapIcon },
+  { href: "/asignacionMateriales", label: "Asignar Materiales", icon: CubeIcon },
   { href: "/asignacionObras", label: "Obra Técnico", icon: HomeIcon },
   { href: "/perfil", label: "Perfil", icon: UserIcon },
   { href: "/admins", label: "Admins", icon: UsersIcon },

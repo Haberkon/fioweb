@@ -48,7 +48,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Sidebar */}
       <aside
         className={`${
-          collapsed ? "w-20" : "w-64"
+          collapsed ? "w-20" : "w-48"
         } bg-gray-900 text-gray-100 flex flex-col fixed inset-y-0 transition-all duration-300`}
       >
         {/* Logo + Toggle */}
@@ -92,7 +92,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Navegación */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1 mt-9">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1 mt-3">
           {navItems.map(({ href, label, icon: Icon }) => {
             const active = pathname.startsWith(href);
             return (
@@ -127,7 +127,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Contenido principal */}
       <main
         className={`flex-1 h-screen overflow-y-auto p-6 bg-gray-50 transition-all duration-300 ${
-          collapsed ? "ml-20" : "ml-64"
+          collapsed ? "ml-20" : "ml-48"
         }`}
       >
         {children}

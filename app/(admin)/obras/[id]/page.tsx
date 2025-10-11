@@ -218,7 +218,17 @@ export default function ObraDetallePage() {
 
       {/* Materiales */}
       <div className="bg-white shadow rounded p-4">
-        <h2 className="text-xl font-semibold mb-2">Materiales asignados</h2>
+
+        <div className="flex items-center justify-between mb-2">
+  <h2 className="text-xl font-semibold">Materiales asignados</h2>
+  <button
+    onClick={() => window.location.href = `/asignarMateriales?obraId=${obraId}`}
+    className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm"
+  >
+    ➕ Asignar materiales
+  </button>
+</div>
+
         {materiales.length > 0 ? (
           <table className="w-full border">
             <thead className="bg-gray-100">

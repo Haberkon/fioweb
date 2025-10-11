@@ -21,14 +21,15 @@ import {
 } from "@heroicons/react/24/outline";
 
 const navItems = [
+  { href: "/home", label: "Inicio", icon: HomeIcon },
   { href: "/obras", label: "Obras", icon: BuildingOfficeIcon },
   { href: "/materiales", label: "Materiales", icon: CubeIcon },
   { href: "/planos", label: "Planos", icon: ClipboardDocumentListIcon },
   { href: "/fotos", label: "Fotos", icon: PhotoIcon },
   { href: "/stock", label: "Stock", icon: TruckIcon },
   { href: "/ubicaciones", label: "Ubicaciones", icon: MapIcon },
-  { href: "/asignacionMateriales", label: "Asignar Materiales", icon: CubeIcon },
-  { href: "/asignacionObras", label: "Obra Técnico", icon: HomeIcon },
+  { href: "/asignacionMateriales", label: "Materiales a Obra", icon: CubeIcon },
+  { href: "/asignacionObras", label: "Técnico a Obra", icon: HomeIcon },
   { href: "/perfil", label: "Perfil", icon: UserIcon },
   { href: "/admins", label: "Admins", icon: UsersIcon },
   { href: "/tecnicos", label: "Técnicos", icon: UsersIcon },
@@ -55,7 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Logo + Toggle */}
         <div className="relative flex items-center justify-center pt-3 pb-3 border-b border-gray-700">
           {collapsed ? (
-            <Link href="/obras">
+            <Link href="/home">
               <Image
                 src="/images/LogoFiocamBurger.png"
                 alt="Fio Icon"
@@ -66,7 +67,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               />
             </Link>
           ) : (
-            <Link href="/obras">
+            <Link href="/home">
               <Image
                 src="/images/LogoFio.png"
                 alt="Fio Logo"

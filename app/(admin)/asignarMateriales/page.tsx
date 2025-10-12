@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Save, X, Search } from "lucide-react";
@@ -13,7 +13,7 @@ type Material = {
   unidad: string | null;
 };
 
-export default function AsignarMaterialesPage() {
+function AsignarMaterialesInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const obraId = searchParams.get("obraId") ?? null;
@@ -29,10 +29,8 @@ export default function AsignarMaterialesPage() {
     if (obraId) cargarDatos();
   }, [obraId]);
 
-  // 🔹 Cargar materiales y asignaciones actuales
   const cargarDatos = async () => {
     setLoading(true);
-
     const { data: mats, error: matsError } = await supabase
       .from("material")
       .select("id,codigo,descripcion,unidad")
@@ -62,7 +60,6 @@ export default function AsignarMaterialesPage() {
     setLoading(false);
   };
 
-  // 🔹 Búsqueda
   const handleSearch = (text: string) => {
     setSearch(text);
     const lower = text.toLowerCase();
@@ -75,13 +72,11 @@ export default function AsignarMaterialesPage() {
     );
   };
 
-  // 🔹 Modificar cantidad
   const handleCantidad = (id: string, value: string) => {
     const num = value === "" ? 0 : parseInt(value);
     setAsignados((prev) => ({ ...prev, [id]: isNaN(num) ? 0 : num }));
   };
 
-  // 🔹 Guardar asignaciones
   const handleGuardar = async () => {
     if (!obraId) {
       alert("❌ No se encontró el ID de la obra.");
@@ -98,10 +93,7 @@ export default function AsignarMaterialesPage() {
         cantidad_planificada: cantidad,
       }));
 
-    console.log("🧱 Datos a insertar:", rows);
-
     try {
-      // 1️⃣ Limpieza total
       const { error: delError } = await supabase
         .from("obra_material")
         .delete()
@@ -109,7 +101,6 @@ export default function AsignarMaterialesPage() {
 
       if (delError) throw new Error(`Error al eliminar anteriores: ${delError.message}`);
 
-      // 2️⃣ Inserción
       if (rows.length > 0) {
         const { error: insError } = await supabase
           .from("obra_material")
@@ -130,7 +121,6 @@ export default function AsignarMaterialesPage() {
 
   return (
     <div className="p-8 flex flex-col h-[calc(100vh-80px)] space-y-5">
-      {/* Encabezado */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">
           Asignar materiales a la obra
@@ -152,7 +142,6 @@ export default function AsignarMaterialesPage() {
         </div>
       </div>
 
-      {/* Buscador */}
       <div className="relative">
         <Search size={18} className="absolute left-3 top-2.5 text-gray-400" />
         <input
@@ -164,7 +153,6 @@ export default function AsignarMaterialesPage() {
         />
       </div>
 
-      {/* Tabla */}
       <div className="flex-1 overflow-auto border border-gray-200 rounded-lg shadow-sm">
         {loading ? (
           <p className="p-4 text-gray-500">Cargando materiales...</p>
@@ -210,6 +198,13 @@ export default function AsignarMaterialesPage() {
     </div>
   );
 }
+
+export default function AsignarMaterialesPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Cargando...</div>}>
+      <AsignarMaterialesInner />
+    </Suspense>
+  );
+}
+
 export const dynamic = "force-dynamic";
-export const fetchCache = "force-no-store";
-export const revalidate = 0;

@@ -47,11 +47,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
-      {/* Sidebar */}
+      {/* 🔹 Sidebar (solo visible en desktop) */}
       <aside
-        className={`${
+        className={`hidden md:flex ${
           collapsed ? "w-20" : "w-48"
-        } bg-gray-900 text-gray-100 flex flex-col fixed inset-y-0 transition-all duration-300`}
+        } bg-gray-900 text-gray-100 flex-col fixed inset-y-0 transition-all duration-300`}
       >
         {/* Logo + Toggle */}
         <div className="relative flex items-center justify-center pt-3 pb-3 border-b border-gray-700">
@@ -78,7 +78,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </Link>
           )}
 
-          {/* 🔹 Botón colapsar/expandir */}
+          {/* Botón colapsar/expandir */}
           <button
             onClick={() => setCollapsed(!collapsed)}
             className={`absolute top-3 p-1 rounded hover:bg-gray-800 transition ${
@@ -126,14 +126,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* Contenido principal */}
+      {/* 🔹 Contenido principal */}
       <main
-        className={`flex-1 h-screen overflow-y-auto p-6 bg-gray-50 transition-all duration-300 ${
-          collapsed ? "ml-20" : "ml-48"
+        className={`flex-1 h-screen overflow-y-auto pb-16 md:pb-0 p-6 bg-gray-50 transition-all duration-300 ${
+          collapsed ? "md:ml-20" : "md:ml-48"
         }`}
       >
         {children}
       </main>
+
+      {/* 🔹 Bottom Navbar (solo visible en mobile) */}
+<nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center py-2 md:hidden shadow-lg">
+  {["/home", "/planos", "/obras", "/ubicaciones", "/fotos", ].map((href) => {
+    const item = navItems.find((i) => i.href === href);
+    if (!item) return null;
+    const active = pathname.startsWith(item.href);
+    const Icon = item.icon;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={`flex flex-col items-center text-xs ${
+          active ? "text-blue-600" : "text-gray-500"
+        }`}
+      >
+        <Icon className="h-6 w-6 mb-1" />
+        <span>{item.label}</span>
+      </Link>
+    );
+  })}
+</nav>
     </div>
   );
 }

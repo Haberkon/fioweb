@@ -136,8 +136,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </main>
 
       {/* 🔹 Bottom Navbar (solo visible en mobile) */}
+       {/* 🔹 Version con Ubicaciones Orden (["/home", "/planos", "/obras", "/ubicaciones", "/fotos", ]) */}
 <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center py-2 md:hidden shadow-lg">
-  {["/home", "/planos", "/obras", "/ubicaciones", "/fotos", ].map((href) => {
+  {["/home", "/planos", "/obras", "/fotos","/perfil", ].map((href) => {
     const item = navItems.find((i) => i.href === href);
     if (!item) return null;
     const active = pathname.startsWith(item.href);

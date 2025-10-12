@@ -11,6 +11,8 @@ import {
   TruckIcon,
   MapIcon,
   UsersIcon,
+  UserCircleIcon,
+  ChartBarIcon,
 } from "@heroicons/react/24/outline";
 
 export default function AdminHome() {
@@ -78,13 +80,23 @@ export default function AdminHome() {
       icon: CubeIcon,
       color: "bg-purple-100 text-purple-600",
     },
+    /* 
+    Ubicaciones
     {
       href: "/ubicaciones",
       label: "Ubicaciones",
       desc: "Mapa de obras",
       icon: MapIcon,
       color: "bg-teal-100 text-teal-600",
-    },
+    }, 
+     */
+    {
+      href: "/consumo",
+      label: "Consumo",
+      desc: "Consumo de materiales",
+      icon: ChartBarIcon,
+      color: "bg-teal-100 text-teal-600",
+    }, 
     {
       href: "/stock",
       label: "Stock",
@@ -96,7 +108,7 @@ export default function AdminHome() {
       href: "/tecnicos",
       label: "Técnicos",
       desc: "Ver técnicos",
-      icon: UsersIcon,
+      icon: UserCircleIcon,
       color: "bg-sky-100 text-sky-600",
     },
   ];

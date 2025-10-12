@@ -18,6 +18,8 @@ import {
   BuildingOfficeIcon,
   TruckIcon,
   UsersIcon,
+  ChartBarIcon,
+  UserCircleIcon,
 } from "@heroicons/react/24/outline";
 
 const navItems = [
@@ -30,9 +32,10 @@ const navItems = [
   { href: "/ubicaciones", label: "Ubicaciones", icon: MapIcon },
   { href: "/asignacionMateriales", label: "Materiales a Obra", icon: CubeIcon },
   { href: "/asignacionObras", label: "Técnico a Obra", icon: BuildingOfficeIcon },
+  { href: "/consumo", label: "Consumo", icon: ChartBarIcon }, // 🆕 NUEVA SECCIÓN
   { href: "/perfil", label: "Perfil", icon: UserIcon },
   { href: "/admins", label: "Admins", icon: UsersIcon },
-  { href: "/tecnicos", label: "Técnicos", icon: UsersIcon },
+  { href: "/tecnicos", label: "Técnicos", icon: UserCircleIcon },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -47,7 +50,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
-      {/* 🔹 Sidebar (solo visible en desktop) */}
+      {/* 🔹 Sidebar */}
       <aside
         className={`hidden md:flex ${
           collapsed ? "w-20" : "w-48"
@@ -78,7 +81,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </Link>
           )}
 
-          {/* Botón colapsar/expandir */}
+          {/* Botón colapsar */}
           <button
             onClick={() => setCollapsed(!collapsed)}
             className={`absolute top-3 p-1 rounded hover:bg-gray-800 transition ${
@@ -136,27 +139,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </main>
 
       {/* 🔹 Bottom Navbar (solo visible en mobile) */}
-       {/* 🔹 Version con Ubicaciones Orden (["/home", "/planos", "/obras", "/ubicaciones", "/fotos", ]) */}
-<nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center py-2 md:hidden shadow-lg">
-  {["/home", "/planos", "/obras", "/fotos","/perfil", ].map((href) => {
-    const item = navItems.find((i) => i.href === href);
-    if (!item) return null;
-    const active = pathname.startsWith(item.href);
-    const Icon = item.icon;
-    return (
-      <Link
-        key={item.href}
-        href={item.href}
-        className={`flex flex-col items-center text-xs ${
-          active ? "text-blue-600" : "text-gray-500"
-        }`}
-      >
-        <Icon className="h-6 w-6 mb-1" />
-        <span>{item.label}</span>
-      </Link>
-    );
-  })}
-</nav>
+      {/* 🔹 Version con Ubicaciones Orden (["/home", "/planos", "/obras", "/ubicaciones", "/fotos", ]) */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center py-2 md:hidden shadow-lg">
+        {["/home", "/planos", "/obras", "/fotos", "/perfil"].map((href) => {
+          const item = navItems.find((i) => i.href === href);
+          if (!item) return null;
+          const active = pathname.startsWith(item.href);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex flex-col items-center text-xs ${
+                active ? "text-blue-600" : "text-gray-500"
+              }`}
+            >
+              <Icon className="h-6 w-6 mb-1" />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }
+

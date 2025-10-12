@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { Wrench, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 type Obra = {
@@ -14,7 +14,7 @@ type Obra = {
   created_at: string | null;
 };
 
-export default function AsignacionesMaterialesPage() {
+export default function ConsumoObrasPage() {
   const [obras, setObras] = useState<Obra[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -29,7 +29,7 @@ export default function AsignacionesMaterialesPage() {
     const { data, error } = await supabase
       .from("obra")
       .select("id, numero_obra, nombre, cliente, estado, created_at")
-      .order("numero_obra", { ascending: true }); // 🔹 ahora ordena por número
+      .order("numero_obra", { ascending: true });
 
     if (error) {
       console.error("Error cargando obras:", error.message);
@@ -48,9 +48,11 @@ export default function AsignacionesMaterialesPage() {
     setFiltered(
       obras.filter(
         (o) =>
+          String(o.numero_obra ?? "")
+            .toLowerCase()
+            .includes(lower) ||
           o.nombre.toLowerCase().includes(lower) ||
-          (o.cliente?.toLowerCase() ?? "").includes(lower) ||
-          String(o.numero_obra ?? "").includes(lower)
+          (o.cliente?.toLowerCase() ?? "").includes(lower)
       )
     );
   };
@@ -59,8 +61,8 @@ export default function AsignacionesMaterialesPage() {
     <div className="p-8 flex flex-col h-[calc(100vh-80px)] space-y-5">
       {/* Encabezado */}
       <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          Asignar Materiales a Obras
+        <h1 className="text-2xl font-bold text-gray-800">
+          Registrar Consumo Manual
         </h1>
       </div>
 
@@ -85,7 +87,7 @@ export default function AsignacionesMaterialesPage() {
           <table className="w-full text-sm text-gray-700">
             <thead className="bg-gray-100 sticky top-0 text-xs uppercase font-semibold">
               <tr>
-                <th className="border p-2 text-center">N° Obra</th>
+                <th className="border p-2 text-center w-[100px]">N° Obra</th>
                 <th className="border p-2 text-left">Nombre</th>
                 <th className="border p-2 text-left">Cliente</th>
                 <th className="border p-2 text-center">Estado</th>
@@ -101,7 +103,7 @@ export default function AsignacionesMaterialesPage() {
                     i % 2 === 0 ? "bg-white" : "bg-gray-50"
                   } hover:bg-blue-50 transition`}
                 >
-                  <td className="border p-2 text-center font-semibold">
+                  <td className="border p-2 text-center font-medium">
                     {obra.numero_obra ?? "-"}
                   </td>
                   <td className="border p-2 font-medium">{obra.nombre}</td>
@@ -124,10 +126,10 @@ export default function AsignacionesMaterialesPage() {
                   </td>
                   <td className="border p-2 text-center">
                     <Link
-                      href={`/asignarMateriales?obraId=${obra.id}`}
+                      href={`/registrarConsumo?obraId=${obra.id}`}
                       className="inline-flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
                     >
-                      Asignar <ArrowRight size={16} />
+                      Registrar <ArrowRight size={16} />
                     </Link>
                   </td>
                 </tr>

@@ -18,6 +18,7 @@ type Material = {
   material_id: string;
   cantidad_planificada: number | null;
   cantidad_real: number | null;
+  por_consumir?: number | null; // 🆕 agregado
   material?: {
     id: string;
     codigo: string;
@@ -78,23 +79,48 @@ export default function ObraDetallePage() {
         .single<Obra>();
       setObra(obraData);
 
-      /** Materiales */
+      /** Materiales + Consumos reales */
       const { data: om } = await supabase
         .from("obra_material")
         .select("*")
         .eq("obra_id", obraId);
 
       let mats: Material[] = [];
+
       if (om && om.length > 0) {
+        // Traer datos base de materiales
         const { data: materialesData } = await supabase
           .from("material")
           .select("id,codigo,descripcion,unidad");
 
-        mats = om.map((m) => ({
-          ...m,
-          material: materialesData?.find((mt) => mt.id === m.material_id) || null,
-        })) as Material[];
+        // 🔹 Traer consumos de esta obra agrupados por material
+        const { data: consumosData } = await supabase
+          .from("consumo")
+          .select("material_id, cantidad")
+          .eq("obra_id", obraId);
+
+        const sumas: Record<string, number> = {};
+        (consumosData ?? []).forEach((c) => {
+          sumas[c.material_id] =
+            (sumas[c.material_id] ?? 0) + Number(c.cantidad);
+        });
+
+        // 🔹 Combinar con cálculos
+        mats = om.map((m) => {
+          const cantidadReal = sumas[m.material_id] ?? 0;
+          const cantidadPlanificada = Number(m.cantidad_planificada ?? 0);
+          const porConsumir = cantidadPlanificada - cantidadReal;
+
+          return {
+            ...m,
+            cantidad_real: cantidadReal,
+            por_consumir: porConsumir,
+            material:
+              materialesData?.find((mt) => mt.id === m.material_id) || null,
+          };
+        }) as Material[];
       }
+
       setMateriales(mats);
 
       /** Técnicos asignados */
@@ -218,16 +244,27 @@ export default function ObraDetallePage() {
 
       {/* Materiales */}
       <div className="bg-white shadow rounded p-4">
-
         <div className="flex items-center justify-between mb-2">
   <h2 className="text-xl font-semibold">Materiales asignados</h2>
-  <button
-    onClick={() => window.location.href = `/asignarMateriales?obraId=${obraId}`}
-    className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm"
-  >
-    ➕ Asignar materiales
-  </button>
-</div>
+  <div className="flex gap-2">
+    <button
+      onClick={() =>
+        (window.location.href = `/registrarConsumo?obraId=${obraId}`)
+      }
+      className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700 text-sm"
+    >
+      ➕ Registrar consumo
+        </button>
+        <button
+          onClick={() =>
+            (window.location.href = `/asignarMateriales?obraId=${obraId}`)
+          }
+          className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm"
+        >
+          ➕ Asignar materiales
+        </button>
+      </div>
+    </div>
 
         {materiales.length > 0 ? (
           <table className="w-full border">
@@ -237,7 +274,8 @@ export default function ObraDetallePage() {
                 <th className="border p-2">Descripción</th>
                 <th className="border p-2">Unidad</th>
                 <th className="border p-2">Planificado</th>
-                <th className="border p-2">Real</th>
+                <th className="border p-2">Consumo</th>
+                <th className="border p-2">Por consumir</th>
               </tr>
             </thead>
             <tbody>
@@ -248,6 +286,20 @@ export default function ObraDetallePage() {
                   <td className="border p-2">{m.material?.unidad}</td>
                   <td className="border p-2">{m.cantidad_planificada ?? "-"}</td>
                   <td className="border p-2">{m.cantidad_real ?? "-"}</td>
+                  <td className="border p-2 font-medium text-center">
+                  <span
+                    className={`${
+                      (m.por_consumir ?? 0) < 0
+                        ? "text-red-600"
+                        : (m.por_consumir ?? 0) === 0
+                        ? "text-gray-500"
+                        : "text-green-600"
+                    }`}
+                  >
+                    {m.por_consumir}
+                  </span>
+                </td>
+
                 </tr>
               ))}
             </tbody>
@@ -275,7 +327,9 @@ export default function ObraDetallePage() {
         {tecnicos.length > 0 ? (
           <ul className="list-disc pl-6">
             {tecnicos.map((t) => (
-              <li key={t.id}>{t.nombre} {t.apellido}</li>
+              <li key={t.id}>
+                {t.nombre} {t.apellido}
+              </li>
             ))}
           </ul>
         ) : (
@@ -386,7 +440,9 @@ export default function ObraDetallePage() {
                       key={id}
                       className="flex items-center justify-between border p-2 rounded"
                     >
-                      <span>{t?.nombre} {t?.apellido}</span>
+                      <span>
+                        {t?.nombre} {t?.apellido}
+                      </span>
                       <button
                         onClick={() =>
                           setSelectedTecnicos((prev) =>

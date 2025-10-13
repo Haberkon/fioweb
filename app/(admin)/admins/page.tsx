@@ -10,8 +10,9 @@ type Admin = {
   auth_user_id: string | null;
   nombre: string;
   apellido: string;
-  email: string;
-  rol: "admin";
+  email: string; // correo de autenticación (auth)
+  correo_laboral: string | null;
+  rol: string;
 };
 
 export default function AdminsPage() {
@@ -20,27 +21,27 @@ export default function AdminsPage() {
   const [editando, setEditando] = useState<Record<string, Partial<Admin>>>({});
   const [creating, setCreating] = useState(false);
 
-  // Modales
   const [showModal, setShowModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Creación
   const [nuevoAdmin, setNuevoAdmin] = useState<Partial<Admin>>({
     nombre: "",
     apellido: "",
     email: "",
+    correo_laboral: "",
+    rol: "admin",
   });
+
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showCreatePass, setShowCreatePass] = useState(false);
 
-  // Cambio de contraseña
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
   const [showPass, setShowPass] = useState(false);
 
-  // Cargar admins
+  // 🔹 Cargar admins
   useEffect(() => {
     const load = async () => {
       try {
@@ -58,7 +59,7 @@ export default function AdminsPage() {
     load();
   }, []);
 
-  // Editar y guardar
+  // 🔹 Editar y guardar
   const handleEdit = (id: string) => {
     const user = admins.find((a) => a.id === id);
     if (user) setEditando((prev) => ({ ...prev, [id]: user }));
@@ -75,29 +76,81 @@ export default function AdminsPage() {
     const { [id]: _, ...rest } = editando;
     setEditando(rest);
   };
+const handleSave = async (id: string) => {
+  const changes = editando[id];
+  if (!changes) return;
 
-  const handleSave = async (id: string) => {
-    const changes = editando[id];
-    if (!changes) return;
+  const user = admins.find((u) => u.id === id);
+  if (!user) return alert("Usuario no encontrado");
 
-    delete (changes as any).email;
-    delete (changes as any).rol;
+  console.log("🧩 Actualizando admin con auth_user_id:", user.auth_user_id);
 
-    const { error } = await supabase
-      .from("app_user_admin")
-      .update(changes)
-      .eq("id", id);
+  // 1️⃣ Actualizar nombre, apellido y correo laboral en app_user_admin
+  const { error: updateError } = await supabase
+    .from("app_user_admin")
+    .update({
+      nombre: changes.nombre ?? user.nombre,
+      apellido: changes.apellido ?? user.apellido,
+      email: changes.correo_laboral ?? user.correo_laboral, // columna email = correo laboral
+    })
+    .eq("auth_user_id", user.auth_user_id); // ✅ usamos auth_user_id (no id)
 
-    if (error) return alert("Error al actualizar: " + error.message);
+  if (updateError) {
+    console.error("Error actualizando app_user_admin:", updateError);
+    alert("❌ Error actualizando datos: " + updateError.message);
+    return;
+  }
 
-    setAdmins((a) => a.map((u) => (u.id === id ? { ...u, ...changes } : u)));
-    handleCancel(id);
-    alert("✅ Administrador actualizado");
-  };
+  // 2️⃣ Si cambió el correo de autenticación (Auth)
+  if (changes.email && changes.email !== user.email && user.auth_user_id) {
+    try {
+      const res = await fetch("/api/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          auth_user_id: user.auth_user_id,
+          email: changes.email,
+        }),
+      });
 
-  // Crear admin
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+    } catch (err: any) {
+      alert("Error actualizando correo de autenticación: " + err.message);
+    }
+  }
+
+  // 3️⃣ Actualizar estado local
+  setAdmins((prev) =>
+    prev.map((u) =>
+      u.id === id
+        ? {
+            ...u,
+            nombre: changes.nombre ?? u.nombre,
+            apellido: changes.apellido ?? u.apellido,
+            correo_laboral: changes.correo_laboral ?? u.correo_laboral,
+            email: changes.email ?? u.email,
+          }
+        : u
+    )
+  );
+
+  handleCancel(id);
+  alert("✅ Administrador actualizado correctamente");
+};
+
+
+
+  // 🔹 Crear admin
   const handleCreateAdmin = async () => {
-    if (!nuevoAdmin.email || !nuevoAdmin.nombre || !nuevoAdmin.apellido || !newPassword || !confirmPassword) {
+    if (
+      !nuevoAdmin.email ||
+      !nuevoAdmin.nombre ||
+      !nuevoAdmin.apellido ||
+      !nuevoAdmin.rol ||
+      !newPassword ||
+      !confirmPassword
+    ) {
       alert("Completa todos los campos requeridos");
       return;
     }
@@ -113,7 +166,8 @@ export default function AdminsPage() {
         password: newPassword,
         nombre: nuevoAdmin.nombre,
         apellido: nuevoAdmin.apellido,
-        rol: "admin",
+        correo_laboral: nuevoAdmin.correo_laboral,
+        rol: nuevoAdmin.rol,
       };
 
       const res = await fetch("/api/users", {
@@ -131,11 +185,12 @@ export default function AdminsPage() {
         nombre: nuevoAdmin.nombre ?? "",
         apellido: nuevoAdmin.apellido ?? "",
         email: nuevoAdmin.email ?? "",
-        rol: "admin",
+        correo_laboral: nuevoAdmin.correo_laboral ?? "",
+        rol: nuevoAdmin.rol ?? "admin",
       };
 
       setAdmins((prev) => [...prev, nuevo]);
-      setNuevoAdmin({ nombre: "", apellido: "", email: "" });
+      setNuevoAdmin({ nombre: "", apellido: "", email: "", correo_laboral: "", rol: "admin" });
       setNewPassword("");
       setConfirmPassword("");
       setShowCreateModal(false);
@@ -147,7 +202,7 @@ export default function AdminsPage() {
     }
   };
 
-  // Cambiar contraseña existente
+  // 🔹 Cambio de contraseña
   const handleResetPassword = (auth_user_id: string | null) => {
     if (!auth_user_id) return alert("Usuario inválido");
     setSelectedUserId(auth_user_id);
@@ -178,7 +233,7 @@ export default function AdminsPage() {
     }
   };
 
-  // Eliminar
+  // 🔹 Eliminar
   const handleDelete = async (u: Admin) => {
     if (!confirm("¿Eliminar administrador?")) return;
     try {
@@ -221,6 +276,7 @@ export default function AdminsPage() {
             <th className="px-3 py-2 text-left">Nombre</th>
             <th className="px-3 py-2 text-left">Apellido</th>
             <th className="px-3 py-2 text-left">Email</th>
+            <th className="px-3 py-2 text-left">Correo laboral</th>
             <th className="px-3 py-2 text-center">Acciones</th>
           </tr>
         </thead>
@@ -243,7 +299,20 @@ export default function AdminsPage() {
                       onChange={(e) => handleChange(u.id, "apellido", e.target.value)}
                     />
                   </td>
-                  <td className="px-3 py-2">{u.email}</td>
+                  <td className="px-3 py-2">
+                    <input
+                      className="border p-1 rounded w-full"
+                      value={editando[u.id].email ?? ""}
+                      onChange={(e) => handleChange(u.id, "email", e.target.value)}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      className="border p-1 rounded w-full"
+                      value={editando[u.id].correo_laboral ?? ""}
+                      onChange={(e) => handleChange(u.id, "correo_laboral", e.target.value)}
+                    />
+                  </td>
                   <td className="px-3 py-2 flex justify-center gap-2">
                     <button onClick={() => handleSave(u.id)}>
                       <Save className="w-5 h-5 text-green-600" />
@@ -258,6 +327,7 @@ export default function AdminsPage() {
                   <td className="px-3 py-2">{u.nombre}</td>
                   <td className="px-3 py-2">{u.apellido}</td>
                   <td className="px-3 py-2">{u.email}</td>
+                  <td className="px-3 py-2">{u.correo_laboral ?? "-"}</td>
                   <td className="px-3 py-2 flex justify-center gap-3">
                     <button onClick={() => handleEdit(u.id)}>
                       <Edit3 className="w-5 h-5 text-blue-600" />
@@ -299,12 +369,28 @@ export default function AdminsPage() {
               />
               <input
                 className="border p-2 rounded col-span-2"
-                placeholder="Email"
+                placeholder="Email (inicio de sesión)"
                 value={nuevoAdmin.email ?? ""}
                 onChange={(e) => setNuevoAdmin({ ...nuevoAdmin, email: e.target.value })}
               />
+              <input
+                className="border p-2 rounded col-span-2"
+                placeholder="Correo laboral"
+                value={nuevoAdmin.correo_laboral ?? ""}
+                onChange={(e) => setNuevoAdmin({ ...nuevoAdmin, correo_laboral: e.target.value })}
+              />
+              <select
+                className="border p-2 rounded col-span-2"
+                value={nuevoAdmin.rol ?? "admin"}
+                onChange={(e) => setNuevoAdmin({ ...nuevoAdmin, rol: e.target.value })}
+              >
+                <option value="admin">Administrador</option>
+                <option value="superadmin">Superadmin</option>
+                <option value="cumplimiento">Cumplimiento</option>
+                <option value="deposito">Depósito</option>
+              </select>
 
-              {/* Contraseña */}
+              {/* Contraseñas */}
               <div className="col-span-2 relative">
                 <input
                   type={showCreatePass ? "text" : "password"}
@@ -322,7 +408,6 @@ export default function AdminsPage() {
                 </button>
               </div>
 
-              {/* Confirmar contraseña */}
               <div className="col-span-2 relative">
                 <input
                   type={showCreatePass ? "text" : "password"}
@@ -331,13 +416,6 @@ export default function AdminsPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowCreatePass((p) => !p)}
-                  className="absolute right-3 top-3 text-gray-500 hover:text-gray-700"
-                >
-                  {showCreatePass ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
               </div>
             </div>
 
@@ -360,7 +438,7 @@ export default function AdminsPage() {
         </div>
       )}
 
-      {/* 🔐 Modal Cambiar Contraseña (con ojos) */}
+      {/* 🔐 Modal Cambiar Contraseña */}
       {showModal && (
         <div
           className="fixed inset-0 flex items-center justify-center z-50"
@@ -368,7 +446,6 @@ export default function AdminsPage() {
         >
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5 border border-gray-200">
             <h2 className="text-lg font-semibold text-gray-800 mb-3">Cambiar Contraseña</h2>
-
             <div className="relative">
               <input
                 type={showPass ? "text" : "password"}
@@ -394,13 +471,6 @@ export default function AdminsPage() {
                 value={confirmPass}
                 onChange={(e) => setConfirmPass(e.target.value)}
               />
-              <button
-                type="button"
-                onClick={() => setShowPass((p) => !p)}
-                className="absolute right-3 top-3 text-gray-500 hover:text-gray-700"
-              >
-                {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
             </div>
 
             <div className="flex justify-end gap-2 pt-3">

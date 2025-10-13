@@ -11,33 +11,30 @@ export async function middleware(req: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
+  // Si no hay sesión → redirigir a login
   if (!session) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // 🔹 Buscar el usuario en app_user_admin
+  // 🔹 Buscar usuario en app_user_admin
   const { data: admin } = await supabase
     .from("app_user_admin")
     .select("id, rol")
     .eq("auth_user_id", session.user.id)
     .maybeSingle();
 
-  // Si no existe en app_user_admin → fuera
+  // Si no existe → redirigir
   if (!admin) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // 🔹 Control de acceso por rol
   const rol = admin.rol;
 
   // Superadmin y Admin → acceso total
-  if (["superadmin", "admin"].includes(rol)) {
-    return res;
-  }
+  if (["superadmin", "admin"].includes(rol)) return res;
 
   // Cumplimiento → restringir secciones de gestión
   if (rol === "cumplimiento") {
-    // Bloquear rutas que no correspondan a su rol
     const restrictedPaths = [
       "/admins",
       "/tecnicos",
@@ -51,7 +48,7 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
-  // Deposito → acceso solo a stock y home
+  // Depósito → acceso solo a stock, home, perfil
   if (rol === "deposito") {
     const allowedPaths = ["/stock", "/home", "/perfil"];
     if (!allowedPaths.some((path) => req.nextUrl.pathname.startsWith(path))) {
@@ -60,13 +57,13 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
-  // Si no coincide con ningún rol conocido
+  // Si no coincide ningún rol conocido
   return NextResponse.redirect(new URL("/login", req.url));
 }
 
-// Protege todo excepto /login y assets estáticos
+// ✅ Protege todo excepto /login, assets estáticos y el endpoint de actualización de usuario
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|images|login).*)",
+    "/((?!api/users|_next/static|_next/image|favicon.ico|images|login).*)",
   ],
 };

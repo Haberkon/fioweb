@@ -10,10 +10,10 @@ type AdminPerfil = {
   auth_user_id: string;
   nombre: string | null;
   apellido: string | null;
-  email: string | null;
+  email: string | null; // correo laboral
   avatar_url: string | null;
   created_at: string | null;
-  rol?: string;
+  rol: string | null;
 };
 
 export default function PerfilPage() {
@@ -23,7 +23,7 @@ export default function PerfilPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Modal de contraseña
+  // Modal contraseña
   const [showModal, setShowModal] = useState(false);
   const [currentPass, setCurrentPass] = useState("");
   const [newPass, setNewPass] = useState("");
@@ -43,9 +43,10 @@ export default function PerfilPage() {
 
       setAuthEmail(user.email ?? "");
 
+      // Trae el perfil completo con el rol real
       const { data, error } = await supabase
         .from("app_user_admin")
-        .select("*")
+        .select("id, auth_user_id, nombre, apellido, email, avatar_url, created_at, rol")
         .eq("auth_user_id", user.id)
         .single();
 
@@ -53,7 +54,7 @@ export default function PerfilPage() {
         console.error(error);
         alert("Error al cargar perfil");
       } else {
-        setPerfil({ ...data, rol: "admin" });
+        setPerfil(data);
       }
 
       setLoading(false);
@@ -68,7 +69,8 @@ export default function PerfilPage() {
   const handleSave = async () => {
     if (!perfil) return;
     setSaving(true);
-    const { id, auth_user_id, created_at, email, rol, ...changes } = perfil;
+
+    const { id, auth_user_id, created_at, rol, ...changes } = perfil;
 
     const { error } = await supabase
       .from("app_user_admin")
@@ -90,7 +92,6 @@ export default function PerfilPage() {
       return alert("Las contraseñas nuevas no coinciden.");
 
     try {
-      // 1️⃣ Verificar contraseña actual
       const { data: userData, error: userError } =
         await supabase.auth.signInWithPassword({
           email: authEmail,
@@ -101,7 +102,6 @@ export default function PerfilPage() {
         return alert("❌ Contraseña actual incorrecta");
       }
 
-      // 2️⃣ Cambiar contraseña
       const res = await fetch("/api/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -153,7 +153,10 @@ export default function PerfilPage() {
               {perfil.nombre} {perfil.apellido}
             </h2>
             <p className="text-gray-500 text-sm mt-1">
-              Rol: <span className="font-medium text-gray-700">{perfil.rol}</span>
+              Rol:{" "}
+              <span className="font-medium text-gray-700">
+                {perfil.rol ?? "—"}
+              </span>
             </p>
           </div>
 
@@ -229,7 +232,6 @@ export default function PerfilPage() {
           </div>
         </div>
 
-        {/* Botones guardar/cancelar */}
         {editando && (
           <div className="flex justify-end gap-3 pt-4 border-t mt-4">
             <button

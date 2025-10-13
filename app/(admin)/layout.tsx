@@ -33,7 +33,7 @@ const navItems = [
   { href: "/asignacionMateriales", label: "Materiales a Obra", icon: CubeIcon },
   { href: "/asignacionObras", label: "Técnico a Obra", icon: BuildingOfficeIcon },
   { href: "/consumo", label: "Consumo", icon: ChartBarIcon }, // 🆕 NUEVA SECCIÓN
-  { href: "/perfil", label: "Perfil", icon: UserIcon },
+  { href: "/perfil", label: "Mi Perfil", icon: UserIcon },
   { href: "/admins", label: "Admins", icon: UsersIcon },
   { href: "/tecnicos", label: "Técnicos", icon: UserCircleIcon },
 ];

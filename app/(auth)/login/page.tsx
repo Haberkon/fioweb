@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const router = useRouter();
@@ -40,7 +42,7 @@ export default function LoginPage() {
       >
         <div className="flex justify-center mb-4">
           <Image
-            src="/images/logofiocamx.png" // ✅ desde public/images
+            src="/images/logofiocamx.png"
             alt="Fiocam Logo"
             width={140}
             height={40}
@@ -49,7 +51,9 @@ export default function LoginPage() {
           />
         </div>
 
-        <h1 className="text-2xl font-bold text-center">Ingreso Admin</h1>
+        <h1 className="text-2xl font-bold text-center text-gray-800">
+          Ingreso Admin
+        </h1>
 
         <input
           type="email"
@@ -60,14 +64,23 @@ export default function LoginPage() {
           className="w-full border rounded p-2"
         />
 
-        <input
-          type="password"
-          placeholder="Contraseña"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="w-full border rounded p-2"
-        />
+        <div className="relative">
+          <input
+            type={showPass ? "text" : "password"}
+            placeholder="Contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full border rounded p-2 pr-10"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPass((prev) => !prev)}
+            className="absolute right-3 top-2.5 text-gray-500 hover:text-gray-700"
+          >
+            {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        </div>
 
         {errorMsg && (
           <p className="text-red-600 text-sm text-center">{errorMsg}</p>
@@ -76,7 +89,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition disabled:opacity-60"
         >
           {loading ? "Ingresando..." : "Ingresar"}
         </button>

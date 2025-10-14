@@ -39,6 +39,7 @@ export async function middleware(req: NextRequest) {
       "/admins",
       "/tecnicos",
       "/asignacionMateriales",
+      "/consumo",
       "/asignacionObras",
       "/materiales",
     ];
@@ -56,9 +57,11 @@ if (rol === "deposito") {
     "/materiales",
     "/planos",
     "/fotos",
-    "/asignacionMateriales",
     "/asignacionObras",
+    "/asignacionMateriales",
+    "/asignarMateriales",
     "/consumo",
+    "/registrarConsumo",
     "/stock",
     "/perfil",
   ];

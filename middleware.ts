@@ -36,12 +36,12 @@ export async function middleware(req: NextRequest) {
   // Cumplimiento → restringir secciones de gestión
   if (rol === "cumplimiento") {
     const restrictedPaths = [
-      "/admins",
-      "/tecnicos",
-      "/asignacionMateriales",
-      "/consumo",
-      "/asignacionObras",
-      "/materiales",
+    "/home",
+    "/obras",
+    "/materiales",
+    "/planos",
+    "/fotos",
+    "/perfil",
     ];
     if (restrictedPaths.some((path) => req.nextUrl.pathname.startsWith(path))) {
       return NextResponse.redirect(new URL("/home", req.url));
@@ -62,7 +62,6 @@ if (rol === "deposito") {
     "/asignarMateriales",
     "/consumo",
     "/registrarConsumo",
-    "/stock",
     "/perfil",
   ];
   if (!allowedPaths.some((path) => req.nextUrl.pathname.startsWith(path))) {

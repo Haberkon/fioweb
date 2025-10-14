@@ -83,17 +83,16 @@ const handleSave = async (id: string) => {
   const user = admins.find((u) => u.id === id);
   if (!user) return alert("Usuario no encontrado");
 
-  console.log("🧩 Actualizando admin con auth_user_id:", user.auth_user_id);
-
-  // 1️⃣ Actualizar nombre, apellido y correo laboral en app_user_admin
+  // 1️⃣ Actualizar datos en app_user_admin
   const { error: updateError } = await supabase
     .from("app_user_admin")
     .update({
       nombre: changes.nombre ?? user.nombre,
       apellido: changes.apellido ?? user.apellido,
-      email: changes.correo_laboral ?? user.correo_laboral, // columna email = correo laboral
+      email: changes.correo_laboral ?? user.correo_laboral, // correo laboral correcto
+      rol: (changes.rol ?? user.rol) as any, // asegurar tipo correcto (enum)
     })
-    .eq("auth_user_id", user.auth_user_id); // ✅ usamos auth_user_id (no id)
+    .eq("auth_user_id", user.auth_user_id);
 
   if (updateError) {
     console.error("Error actualizando app_user_admin:", updateError);
@@ -101,7 +100,7 @@ const handleSave = async (id: string) => {
     return;
   }
 
-  // 2️⃣ Si cambió el correo de autenticación (Auth)
+  // 2️⃣ Si cambió el correo de autenticación (auth)
   if (changes.email && changes.email !== user.email && user.auth_user_id) {
     try {
       const res = await fetch("/api/users", {
@@ -112,7 +111,6 @@ const handleSave = async (id: string) => {
           email: changes.email,
         }),
       });
-
       const result = await res.json();
       if (!res.ok) throw new Error(result.error);
     } catch (err: any) {
@@ -120,27 +118,13 @@ const handleSave = async (id: string) => {
     }
   }
 
-  // 3️⃣ Actualizar estado local
-  setAdmins((prev) =>
-    prev.map((u) =>
-      u.id === id
-        ? {
-            ...u,
-            nombre: changes.nombre ?? u.nombre,
-            apellido: changes.apellido ?? u.apellido,
-            correo_laboral: changes.correo_laboral ?? u.correo_laboral,
-            email: changes.email ?? u.email,
-          }
-        : u
-    )
-  );
-
+  // 3️⃣ Actualizar local
+  setAdmins((prev) => prev.map((u) => (u.id === id ? { ...u, ...changes } : u)));
   handleCancel(id);
   alert("✅ Administrador actualizado correctamente");
 };
 
-
-
+ 
   // 🔹 Crear admin
   const handleCreateAdmin = async () => {
     if (
@@ -223,7 +207,6 @@ const handleSave = async (id: string) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ auth_user_id: selectedUserId, password: newPass }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       alert("✅ Contraseña cambiada correctamente");
@@ -269,22 +252,37 @@ const handleSave = async (id: string) => {
         </button>
       </div>
 
-      {/* Tabla */}
       <table className="min-w-full bg-white rounded shadow">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="px-3 py-2 text-left">Nombre</th>
-            <th className="px-3 py-2 text-left">Apellido</th>
-            <th className="px-3 py-2 text-left">Email</th>
-            <th className="px-3 py-2 text-left">Correo laboral</th>
-            <th className="px-3 py-2 text-center">Acciones</th>
-          </tr>
-        </thead>
+  <thead className="bg-gray-100">
+    <tr>
+      <th className="px-3 py-2 text-left">Rol</th>
+      <th className="px-3 py-2 text-left">Nombre</th>
+      <th className="px-3 py-2 text-left">Apellido</th>
+      <th className="px-3 py-2 text-left">Email</th>
+      <th className="px-3 py-2 text-left">Correo laboral</th>
+      <th className="px-3 py-2 text-center">Acciones</th>
+    </tr>
+  </thead>
+
         <tbody>
           {admins.map((u) => (
             <tr key={u.id} className="border-t">
               {editando[u.id] ? (
                 <>
+                  {/* Rol editable */}
+                  <td className="px-3 py-2">
+                    <select
+                      className="border p-1 rounded w-full"
+                      value={editando[u.id].rol ?? u.rol}
+                      onChange={(e) => handleChange(u.id, "rol", e.target.value)}
+                    >
+                      <option value="admin">Administrador</option>
+                      <option value="superadmin">Superadmin</option>
+                      <option value="cumplimiento">Cumplimiento</option>
+                      <option value="deposito">Deposito</option>
+                    </select>
+                  </td>
+
                   <td className="px-3 py-2">
                     <input
                       className="border p-1 rounded w-full"
@@ -310,7 +308,9 @@ const handleSave = async (id: string) => {
                     <input
                       className="border p-1 rounded w-full"
                       value={editando[u.id].correo_laboral ?? ""}
-                      onChange={(e) => handleChange(u.id, "correo_laboral", e.target.value)}
+                      onChange={(e) =>
+                        handleChange(u.id, "correo_laboral", e.target.value)
+                      }
                     />
                   </td>
                   <td className="px-3 py-2 flex justify-center gap-2">
@@ -324,6 +324,24 @@ const handleSave = async (id: string) => {
                 </>
               ) : (
                 <>
+                  {/* Rol con chip de color */}
+                  <td className="px-3 py-2">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        u.rol === "superadmin"
+                          ? "bg-green-100 text-green-700"
+                          : u.rol === "admin"
+                          ? "bg-blue-100 text-blue-700"
+                          : u.rol === "cumplimiento"
+                          ?  "bg-yellow-200 text-yellow-800"
+                          : u.rol === "deposito"
+                          ? "bg-orange-200 text-gray-700"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {u.rol.charAt(0).toUpperCase() + u.rol.slice(1)}
+                    </span>
+                  </td>
                   <td className="px-3 py-2">{u.nombre}</td>
                   <td className="px-3 py-2">{u.apellido}</td>
                   <td className="px-3 py-2">{u.email}</td>
@@ -346,14 +364,15 @@ const handleSave = async (id: string) => {
         </tbody>
       </table>
 
+
       {/* ➕ Modal Crear Admin */}
       {showCreateModal && (
-        <div
-          className="fixed inset-0 flex items-center justify-center z-50"
-          style={{ backgroundColor: "rgba(0,0,0,0.2)" }}
-        >
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/20">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-5 border border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-800 mb-3">Crear Nuevo Administrador</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-3">
+              Crear Nuevo Administrador
+            </h2>
+
             <div className="grid grid-cols-2 gap-3">
               <input
                 className="border p-2 rounded"
@@ -387,7 +406,7 @@ const handleSave = async (id: string) => {
                 <option value="admin">Administrador</option>
                 <option value="superadmin">Superadmin</option>
                 <option value="cumplimiento">Cumplimiento</option>
-                <option value="deposito">Depósito</option>
+                <option value="deposito">Deposito</option>
               </select>
 
               {/* Contraseñas */}
@@ -440,10 +459,7 @@ const handleSave = async (id: string) => {
 
       {/* 🔐 Modal Cambiar Contraseña */}
       {showModal && (
-        <div
-          className="fixed inset-0 flex items-center justify-center z-50"
-          style={{ backgroundColor: "rgba(0,0,0,0.2)" }}
-        >
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/20">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5 border border-gray-200">
             <h2 className="text-lg font-semibold text-gray-800 mb-3">Cambiar Contraseña</h2>
             <div className="relative">

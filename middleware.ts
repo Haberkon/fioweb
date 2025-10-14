@@ -48,14 +48,26 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
-  // Depósito → acceso solo a stock, home, perfil
-  if (rol === "deposito") {
-    const allowedPaths = ["/stock", "/home", "/perfil"];
-    if (!allowedPaths.some((path) => req.nextUrl.pathname.startsWith(path))) {
-      return NextResponse.redirect(new URL("/home", req.url));
-    }
-    return res;
+  // Depósito → acceso permitido a varias secciones
+if (rol === "deposito") {
+  const allowedPaths = [
+    "/home",
+    "/obras",
+    "/materiales",
+    "/planos",
+    "/fotos",
+    "/asignacionMateriales",
+    "/asignacionObras",
+    "/consumo",
+    "/stock",
+    "/perfil",
+  ];
+  if (!allowedPaths.some((path) => req.nextUrl.pathname.startsWith(path))) {
+    return NextResponse.redirect(new URL("/home", req.url));
   }
+  return res;
+}
+
 
   // Si no coincide ningún rol conocido
   return NextResponse.redirect(new URL("/login", req.url));

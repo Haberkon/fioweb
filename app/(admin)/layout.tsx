@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -22,6 +23,7 @@ import {
   UserCircleIcon,
 } from "@heroicons/react/24/outline";
 
+// 🔹 Ítems del menú lateral
 const navItems = [
   { href: "/home", label: "Inicio", icon: HomeIcon },
   { href: "/obras", label: "Obras", icon: BuildingOfficeIcon },
@@ -32,13 +34,13 @@ const navItems = [
   { href: "/ubicaciones", label: "Ubicaciones", icon: MapIcon },
   { href: "/asignacionMateriales", label: "Materiales a Obra", icon: CubeIcon },
   { href: "/asignacionObras", label: "Técnico a Obra", icon: BuildingOfficeIcon },
-  { href: "/consumo", label: "Consumo", icon: ChartBarIcon }, // 🆕 NUEVA SECCIÓN
+  { href: "/consumo", label: "Consumo", icon: ChartBarIcon },
   { href: "/perfil", label: "Mi Perfil", icon: UserIcon },
   { href: "/admins", label: "Admins", icon: UsersIcon },
   { href: "/tecnicos", label: "Técnicos", icon: UserCircleIcon },
 ];
 
-// 🔹 ROLES ADMIN - Tabla de permisos por rol
+// 🔹 Tabla de permisos por rol
 const permisosPorRol: Record<string, "all" | string[]> = {
   superadmin: "all",
   admin: [
@@ -47,13 +49,10 @@ const permisosPorRol: Record<string, "all" | string[]> = {
     "/materiales",
     "/planos",
     "/fotos",
-    // "/stock",
-    // "/ubicaciones",
     "/asignacionMateriales",
     "/asignacionObras",
     "/consumo",
     "/perfil",
-    // "/admins",
     "/tecnicos",
   ],
   deposito: [
@@ -67,24 +66,17 @@ const permisosPorRol: Record<string, "all" | string[]> = {
     "/consumo",
     "/perfil",
   ],
-  cumplimiento: [
-    "/home",
-    "/obras",
-    "/planos",
-    "/fotos",
-    "/consumo",
-    "/perfil",
-  ],
+  cumplimiento: ["/home", "/obras", "/planos", "/fotos", "/consumo", "/perfil"],
 };
-// 🔹 FIN ROLES ADMIN - Tabla de permisos por rol
 
+// 🔹 LAYOUT PRINCIPAL
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [rol, setRol] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
-  // 🔹 Obtener rol actual desde Supabase
+  // Obtener el rol desde Supabase
   useEffect(() => {
     const getRol = async () => {
       const { data: userData } = await supabase.auth.getUser();
@@ -98,7 +90,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .single();
 
       if (!error && data) {
-        setRol(data.rol);
+        setRol(data.rol?.toLowerCase()); // 👈 normalizamos el rol a minúsculas
       } else {
         setRol(null);
       }
@@ -107,28 +99,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     getRol();
   }, []);
 
+  // Cerrar sesión
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
 
-  // 🔒 Redirección automática si el rol intenta acceder a una ruta no permitida
-useEffect(() => {
+  // 🔒 Control de acceso por rol
+ useEffect(() => {
   if (!rol || pathname === "/denegado") return;
 
   const permisos = permisosPorRol[rol];
+  console.log("ROL DETECTADO:", rol);
+  console.log("PATHNAME:", pathname);
+  console.log("PERMISOS:", permisos);
 
-  // 🟢 Si el rol tiene acceso total (por ejemplo, superadmin)
   if (permisos === "all") return;
-
-  // 🔒 Si no tiene permisos definidos, redirigir
   if (!permisos || permisos.length === 0) {
     router.push("/denegado");
     return;
   }
 
-  // 🧭 Verificar si la ruta actual está permitida
-  const tienePermiso = permisos.some((ruta) => pathname.startsWith(ruta));
+  const tienePermiso = permisos.some((ruta) => pathname.includes(ruta));
+  console.log("TIENE PERMISO?", tienePermiso);
 
   if (!tienePermiso) {
     router.push("/denegado");
@@ -144,7 +137,7 @@ useEffect(() => {
           collapsed ? "w-20" : "w-48"
         } bg-gray-900 text-gray-100 flex-col fixed inset-y-0 transition-all duration-300`}
       >
-        {/* Logo + Toggle */}
+        {/* Logo y botón de colapsar */}
         <div className="relative flex items-center justify-center pt-3 pb-3 border-b border-gray-700">
           {collapsed ? (
             <Link href="/home">
@@ -169,7 +162,6 @@ useEffect(() => {
             </Link>
           )}
 
-          {/* Botón colapsar */}
           <button
             onClick={() => setCollapsed(!collapsed)}
             className={`absolute top-3 p-1 rounded hover:bg-gray-800 transition ${
@@ -184,18 +176,18 @@ useEffect(() => {
           </button>
         </div>
 
-        {/* Navegación */}
+        {/* Navegación lateral */}
         <nav className="flex-1 overflow-y-auto p-3 space-y-1 mt-3">
           {navItems
             .filter(({ href }) => {
-              if (!rol) return false; // Si aún no cargó el rol
+              if (!rol) return false;
               const permisos = permisosPorRol[rol];
-              if (!permisos) return false; // rol no registrado
-              if (permisos === "all") return true; // acceso total
-              return permisos.includes(href); // acceso limitado
+              if (!permisos) return false;
+              if (permisos === "all") return true;
+              return permisos.some((ruta) => href.includes(ruta)); // 👈 cambio a includes
             })
             .map(({ href, label, icon: Icon }) => {
-              const active = pathname.startsWith(href);
+              const active = pathname.includes(href);
               return (
                 <Link
                   key={href}
@@ -233,23 +225,20 @@ useEffect(() => {
       </aside>
 
       {/* 🔹 Contenido principal */}
-      {/* Redireccion si intenta acceder a una ruta sin permiso */}
       <main
-  className={`flex-1 h-screen overflow-y-auto pb-16 md:pb-0 p-6 bg-gray-50 transition-all duration-300 ${
-    collapsed ? "md:ml-20" : "md:ml-48"
-  }`}
->
-  {children}
-</main>
+        className={`flex-1 h-screen overflow-y-auto pb-16 md:pb-0 p-6 bg-gray-50 transition-all duration-300 ${
+          collapsed ? "md:ml-20" : "md:ml-48"
+        }`}
+      >
+        {children}
+      </main>
 
-
-      {/* 🔹 Bottom Navbar (solo visible en mobile) */}
-      {/* 🔹 Version con Ubicaciones Orden (["/home", "/planos", "/obras", "/ubicaciones", "/fotos", ]) */}
+      {/* 🔹 Navbar inferior (mobile) */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center py-2 md:hidden shadow-lg">
         {["/home", "/planos", "/obras", "/fotos", "/perfil"].map((href) => {
           const item = navItems.find((i) => i.href === href);
           if (!item) return null;
-          const active = pathname.startsWith(item.href);
+          const active = pathname.includes(item.href);
           const Icon = item.icon;
           return (
             <Link

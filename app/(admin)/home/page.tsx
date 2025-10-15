@@ -161,8 +161,8 @@ export default function AdminHome() {
       "/planos", 
       "/fotos",
       "/consumo",
-      "/ubicaciones", 
-      "/stock", 
+      // "/ubicaciones", 
+      // "/stock", 
       "/perfil",
     ],
   };

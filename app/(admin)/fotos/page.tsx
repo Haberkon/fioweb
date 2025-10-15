@@ -151,98 +151,140 @@ export default function FotosObrasPage() {
     }
   };
 
-  // 🔹 Descarga con datos
-  const handleDownloadConGeo = async (obraId: string, tipo: "ayer" | "hoy" | "total") => {
-    setShowModal(true);
-    setProgress(0);
-    setStatus("loading");
-    setMensaje(`Generando imágenes con datos (${tipo})...`);
+  // 🔹 Descarga con datos (6 campos: nombre, categoría, fecha, ubicación, dirección, técnico)
+const handleDownloadConGeo = async (obraId: string, tipo: "ayer" | "hoy" | "total") => {
+  setShowModal(true);
+  setProgress(0);
+  setStatus("loading");
+  setMensaje(`Generando imágenes con datos (${tipo})...`);
 
-    try {
-      const hoy = new Date();
-      const ayer = new Date(hoy);
-      ayer.setDate(hoy.getDate() - 1);
+  try {
+    const hoy = new Date();
+    const ayer = new Date(hoy);
+    ayer.setDate(hoy.getDate() - 1);
 
-      const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0);
-      const finHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
-      const inicioAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 0, 0, 0);
-      const finAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 23, 59, 59);
+    const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0);
+    const finHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
+    const inicioAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 0, 0, 0);
+    const finAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 23, 59, 59);
 
-      let query = supabase
-        .from("foto")
-        .select("id, storage_path, nombre, categoria, tomado_en, lat, lon, tecnico_id")
-        .eq("obra_id", obraId);
+    let query = supabase
+      .from("foto")
+      .select("id, storage_path, nombre, categoria, tomado_en, lat, lon, tecnico_id")
+      .eq("obra_id", obraId);
 
-      if (tipo === "hoy")
-        query = query.gte("tomado_en", inicioHoy.toISOString()).lte("tomado_en", finHoy.toISOString());
-      if (tipo === "ayer")
-        query = query.gte("tomado_en", inicioAyer.toISOString()).lte("tomado_en", finAyer.toISOString());
+    if (tipo === "hoy")
+      query = query.gte("tomado_en", inicioHoy.toISOString()).lte("tomado_en", finHoy.toISOString());
+    if (tipo === "ayer")
+      query = query.gte("tomado_en", inicioAyer.toISOString()).lte("tomado_en", finAyer.toISOString());
 
-      const { data: fotos } = await query;
-      if (!fotos?.length) {
-        setMensaje(`No hay fotos disponibles para ${tipo}.`);
-        setStatus("error");
-        return;
-      }
-
-      const zip = new JSZip();
-      let i = 0;
-
-      for (const f of fotos) {
-        const { data } = await supabase.storage.from("fotos").createSignedUrl(f.storage_path, 3600);
-        if (!data?.signedUrl) continue;
-
-        const imgBlob = await fetch(data.signedUrl).then((r) => r.blob());
-        const img = await createImageBitmap(imgBlob);
-
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height + 300;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) continue;
-
-        ctx.drawImage(img, 0, 0);
-        const bannerOffset = 600;
-        ctx.fillStyle = "rgba(0,0,0,0.6)";
-        ctx.fillRect(0, img.height - bannerOffset, img.width, 600);
-        ctx.fillStyle = "white";
-        ctx.font = "96px sans-serif";
-        const baseY = img.height - bannerOffset + 150;
-        const line = 90;
-
-        ctx.fillText(`Nombre: ${f.nombre ?? "-"}`, 60, baseY);
-        ctx.fillText(`Categoría: ${f.categoria ?? "-"}`, 60, baseY + line);
-        ctx.fillText(
-          `Fecha y hora: ${
-            f.tomado_en ? new Date(f.tomado_en).toLocaleString("es-AR") : "-"
-          }`,
-          60,
-          baseY + line * 2
-        );
-        ctx.fillText(`Ubicación: ${f.lat && f.lon ? `${f.lat.toFixed(6)}, ${f.lon.toFixed(6)}` : "Sin datos"}`, 60, baseY + line * 3);
-
-        const blobFinal = await new Promise<Blob>((res) =>
-          canvas.toBlob((b) => res(b!), "image/jpeg", 0.9)
-        );
-
-        zip.file(f.storage_path.split("/").pop() || `${f.id}.jpg`, blobFinal);
-
-        i++;
-        setProgress(Math.round((i / fotos.length) * 100));
-        setMensaje(`Procesando ${i} de ${fotos.length} fotos (${tipo})...`);
-      }
-
-      const zipBlob = await zip.generateAsync({ type: "blob" });
-      saveAs(zipBlob, `FotosConDatos_${tipo}_${obraId}.zip`);
-      setStatus("success");
-      setMensaje(`✅ Descarga completa (${tipo})`);
-    } catch {
+    const { data: fotos } = await query;
+    if (!fotos?.length) {
+      setMensaje(`No hay fotos disponibles para ${tipo}.`);
       setStatus("error");
-      setMensaje("❌ Error al generar imágenes con datos.");
-    } finally {
-      setDownloading(null);
+      return;
     }
-  };
+
+    const zip = new JSZip();
+    let i = 0;
+
+    for (const f of fotos) {
+      // URL firmada
+      const { data } = await supabase.storage.from("fotos").createSignedUrl(f.storage_path, 3600);
+      if (!data?.signedUrl) continue;
+
+      // Dirección convertida
+      let direccionCompleta = "";
+      if (f.lat && f.lon) {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${f.lat}&lon=${f.lon}`
+          );
+          const geo = await res.json();
+          direccionCompleta = geo.display_name || "";
+        } catch {
+          direccionCompleta = "";
+        }
+      }
+
+      // Técnico
+      let tecnicoNombre = "";
+      if (f.tecnico_id) {
+        const { data: tData } = await supabase
+          .from("app_user")
+          .select("nombre, apellido")
+          .eq("id", f.tecnico_id)
+          .maybeSingle();
+        tecnicoNombre = tData ? `${tData.nombre} ${tData.apellido}` : "Desconocido";
+      }
+
+      // Crear imagen con banner
+      const imgBlob = await fetch(data.signedUrl).then((r) => r.blob());
+      const img = await createImageBitmap(imgBlob);
+
+      const extra = 700;
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height + extra;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) continue;
+
+      ctx.drawImage(img, 0, 0);
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillRect(0, img.height - extra, img.width, extra);
+      ctx.fillStyle = "white";
+      ctx.font = "bold 90px sans-serif";
+      const baseY = img.height - extra + 140;
+      const line = 90;
+
+      ctx.fillText(`Nombre: ${f.nombre ?? "-"}`, 60, baseY);
+      ctx.fillText(`Categoría: ${f.categoria ?? "-"}`, 60, baseY + line);
+      ctx.fillText(
+        `Fecha y hora: ${
+          f.tomado_en ? new Date(f.tomado_en).toLocaleString("es-AR") : "-"
+        }`,
+        60,
+        baseY + line * 2
+      );
+      ctx.fillText(
+        `Ubicación: ${
+          f.lat && f.lon ? `${f.lat.toFixed(6)}, ${f.lon.toFixed(6)}` : "Sin datos"
+        }`,
+        60,
+        baseY + line * 3
+      );
+
+      const direccionCorta = direccionCompleta
+        ? direccionCompleta.split(",").slice(0, 3).join(",")
+        : "Sin dirección disponible";
+      ctx.fillText(`Dirección: ${direccionCorta}`, 60, baseY + line * 4);
+
+      ctx.fillText(`Técnico: ${tecnicoNombre || "Desconocido"}`, 60, baseY + line * 5);
+
+      // Convertir a blob y agregar al ZIP
+      const blobFinal = await new Promise<Blob>((res) =>
+        canvas.toBlob((b) => res(b!), "image/jpeg", 0.9)
+      );
+      zip.file(f.storage_path.split("/").pop() || `${f.id}.jpg`, blobFinal);
+
+      i++;
+      setProgress(Math.round((i / fotos.length) * 100));
+      setMensaje(`Procesando ${i} de ${fotos.length} fotos (${tipo})...`);
+    }
+
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    saveAs(zipBlob, `FotosConDatos_${tipo}_${obraId}.zip`);
+    setStatus("success");
+    setMensaje(`✅ Descarga completa (${tipo})`);
+  } catch (e) {
+    console.error(e);
+    setStatus("error");
+    setMensaje("❌ Error al generar imágenes con datos.");
+  } finally {
+    setDownloading(null);
+  }
+};
+
 
   const handleCancel = () => {
     cancelRef.current = true;

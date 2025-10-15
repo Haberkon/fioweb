@@ -28,15 +28,16 @@ export default function FotosObraDetalle() {
   const [selectedFoto, setSelectedFoto] = useState<Foto | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [extraLoading, setExtraLoading] = useState(false);
   const [direccion, setDireccion] = useState<string>("");
+  const [tecnico, setTecnico] = useState<string>("");
 
-  // 🔹 Cargar fotos
+  // 🔹 Cargar fotos principales
   useEffect(() => {
     if (!obraId) return;
-
     (async () => {
       setLoading(true);
-      const { data: fotosRaw, error } = await supabase
+      const { data, error } = await supabase
         .from("foto")
         .select(
           "id, nombre, categoria, storage_path, tomado_en, lat, lon, tecnico_id"
@@ -47,11 +48,11 @@ export default function FotosObraDetalle() {
       if (error) console.error("Error cargando fotos:", error.message);
 
       const fotosSigned: Foto[] = await Promise.all(
-        (fotosRaw ?? []).map(async (f) => {
-          const { data } = await supabase.storage
+        (data ?? []).map(async (f) => {
+          const { data: signed } = await supabase.storage
             .from("fotos")
             .createSignedUrl(f.storage_path, 3600);
-          return { ...f, url: data?.signedUrl ?? null };
+          return { ...f, url: signed?.signedUrl ?? null };
         })
       );
 
@@ -60,12 +61,15 @@ export default function FotosObraDetalle() {
     })();
   }, [obraId]);
 
-  // 🔹 Dirección y técnico
+  // 🔹 Cargar datos extra (dirección + técnico) al seleccionar
   useEffect(() => {
     const fetchExtra = async () => {
       if (!selectedFoto) return;
+      setExtraLoading(true);
+      setDireccion("");
+      setTecnico("");
 
-      // Dirección
+      // Dirección convertida
       if (selectedFoto.lat && selectedFoto.lon) {
         try {
           const res = await fetch(
@@ -76,8 +80,6 @@ export default function FotosObraDetalle() {
         } catch {
           setDireccion("");
         }
-      } else {
-        setDireccion("");
       }
 
       // Técnico
@@ -88,21 +90,11 @@ export default function FotosObraDetalle() {
           .eq("id", selectedFoto.tecnico_id)
           .maybeSingle();
 
-        if (tecnicoData) {
-          setSelectedFoto((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  tecnico: `${tecnicoData.nombre} ${tecnicoData.apellido}`,
-                }
-              : prev
-          );
-        } else {
-          setSelectedFoto((prev) =>
-            prev ? { ...prev, tecnico: "N/D" } : prev
-          );
-        }
+        if (tecnicoData)
+          setTecnico(`${tecnicoData.nombre} ${tecnicoData.apellido}`);
       }
+
+      setExtraLoading(false);
     };
 
     fetchExtra();
@@ -115,7 +107,6 @@ export default function FotosObraDetalle() {
     setSelectedIndex(prev);
     setSelectedFoto(fotos[prev]);
   };
-
   const handleNext = () => {
     if (selectedIndex === null) return;
     const next = (selectedIndex + 1) % fotos.length;
@@ -123,7 +114,7 @@ export default function FotosObraDetalle() {
     setSelectedFoto(fotos[next]);
   };
 
-  // 🔹 Navegación con teclado
+  // 🔹 Teclado ← → Esc
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (!selectedFoto) return;
@@ -135,36 +126,53 @@ export default function FotosObraDetalle() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [selectedFoto, selectedIndex]);
 
-  // 🔹 Descarga con datos (Canvas)
+  // 🔹 Descarga con datos (canvas)
   const handleDescargarConDatos = async (foto: Foto) => {
     if (!foto.url) return;
-
     try {
+      let direccionCompleta = "";
+      if (foto.lat && foto.lon) {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${foto.lat}&lon=${foto.lon}`
+          );
+          const data = await res.json();
+          direccionCompleta = data.display_name || "";
+        } catch {
+          direccionCompleta = "";
+        }
+      }
+
+      let tecnicoNombre = tecnico || "";
+      if (!tecnicoNombre && foto.tecnico_id) {
+        const { data: tData } = await supabase
+          .from("app_user")
+          .select("nombre, apellido")
+          .eq("id", foto.tecnico_id)
+          .maybeSingle();
+        tecnicoNombre = tData
+          ? `${tData.nombre} ${tData.apellido}`
+          : "Desconocido";
+      }
+
       const response = await fetch(foto.url);
       const imgBlob = await response.blob();
       const img = await createImageBitmap(imgBlob);
 
-      // Crear canvas con espacio adicional para los datos
-      const extra = 300;
+      const extra = 700;
       const canvas = document.createElement("canvas");
       canvas.width = img.width;
       canvas.height = img.height + extra;
-
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
       ctx.drawImage(img, 0, 0);
-
-      // Banner negro
-      const bannerHeight = 280;
       ctx.fillStyle = "rgba(0,0,0,0.6)";
-      ctx.fillRect(0, img.height - bannerHeight, img.width, bannerHeight);
-
-      // Texto blanco
+      ctx.fillRect(0, img.height - extra, img.width, extra);
       ctx.fillStyle = "white";
-      ctx.font = "bold 48px sans-serif";
-      const baseY = img.height - bannerHeight + 100;
-      const line = 55;
+      ctx.font = "bold 90px sans-serif";
+      const baseY = img.height - extra + 140;
+      const line = 90;
 
       ctx.fillText(`Nombre: ${foto.nombre ?? "-"}`, 60, baseY);
       ctx.fillText(`Categoría: ${foto.categoria ?? "-"}`, 60, baseY + line);
@@ -187,7 +195,12 @@ export default function FotosObraDetalle() {
         baseY + line * 3
       );
 
-      // Exportar y descargar
+      const direccionCorta = direccionCompleta
+        ? direccionCompleta.split(",").slice(0, 3).join(",")
+        : "Sin dirección disponible";
+      ctx.fillText(`Dirección: ${direccionCorta}`, 60, baseY + line * 4);
+      ctx.fillText(`Técnico: ${tecnicoNombre}`, 60, baseY + line * 5);
+
       const blobFinal = await new Promise<Blob>((res) =>
         canvas.toBlob((b) => res(b!), "image/jpeg", 0.9)
       );
@@ -237,7 +250,7 @@ export default function FotosObraDetalle() {
         </div>
       )}
 
-      {/* 🔹 Modal con carrusel y descarga */}
+      {/* 🔹 Modal detalle */}
       {selectedFoto && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
           <div className="relative flex items-center justify-center max-w-4xl w-full">
@@ -249,6 +262,7 @@ export default function FotosObraDetalle() {
               ‹
             </button>
 
+            {/* Contenido */}
             <div className="bg-white rounded-xl shadow-xl max-w-lg w-full overflow-hidden relative">
               <div className="relative bg-gray-100 flex justify-center items-center">
                 {selectedFoto.url && (
@@ -268,42 +282,59 @@ export default function FotosObraDetalle() {
                 </button>
               </div>
 
-              <div className="p-4 text-sm text-gray-700 space-y-1">
-                <p>
-                  <strong>Nombre:</strong>{" "}
-                  {selectedFoto.nombre ??
-                    selectedFoto.storage_path.split("/").pop() ??
-                    "Sin nombre"}
-                </p>
-                <p>
-                  <strong>Categoría:</strong>{" "}
-                  {selectedFoto.categoria ?? "Sin categoría"}
-                </p>
-                <p>
-                  <strong>Fecha y hora:</strong>{" "}
-                  {selectedFoto.tomado_en
-                    ? new Date(selectedFoto.tomado_en).toLocaleString("es-AR")
-                    : "-"}
-                </p>
-                <p className="truncate">
-                  <strong>Ubicación:</strong>{" "}
-                  {direccion
-                    ? direccion.split(",").slice(0, 3).join(",")
-                    : "No disponible"}
-                </p>
-                <p>
-                  <strong>Técnico:</strong>{" "}
-                  {selectedFoto.tecnico ?? "Desconocido"}
-                </p>
+              {/* Datos */}
+              <div className="p-4 text-sm text-gray-700 space-y-1 min-h-[140px]">
+                {extraLoading ? (
+                  <p className="text-gray-500 italic">Cargando datos...</p>
+                ) : (
+                  <>
+                    <p>
+                      <strong>Nombre:</strong>{" "}
+                      {selectedFoto.nombre ??
+                        selectedFoto.storage_path.split("/").pop() ??
+                        "Sin nombre"}
+                    </p>
+                    <p>
+                      <strong>Categoría:</strong>{" "}
+                      {selectedFoto.categoria ?? "Sin categoría"}
+                    </p>
+                    <p>
+                      <strong>Fecha y hora:</strong>{" "}
+                      {selectedFoto.tomado_en
+                        ? new Date(selectedFoto.tomado_en).toLocaleString(
+                            "es-AR"
+                          )
+                        : "-"}
+                    </p>
+                    <p>
+                      <strong>Ubicación:</strong>{" "}
+                      {selectedFoto.lat && selectedFoto.lon
+                        ? `${selectedFoto.lat.toFixed(6)}, ${selectedFoto.lon.toFixed(6)}`
+                        : "Sin datos"}
+                    </p>
+                    <p className="truncate">
+                      <strong>Dirección:</strong>{" "}
+                      {direccion
+                        ? direccion.split(",").slice(0, 3).join(",")
+                        : "No disponible"}
+                    </p>
+                    <p>
+                      <strong>Técnico:</strong>{" "}
+                      {tecnico || "Desconocido"}
+                    </p>
+                  </>
+                )}
               </div>
 
               {/* Botón descarga */}
-              <button
-                onClick={() => handleDescargarConDatos(selectedFoto)}
-                className="absolute bottom-4 right-4 bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center gap-2 shadow-md"
-              >
-                ☁️ Descargar
-              </button>
+              {!extraLoading && (
+                <button
+                  onClick={() => handleDescargarConDatos(selectedFoto)}
+                  className="absolute bottom-4 right-4 bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center gap-2 shadow-md"
+                >
+                  ☁️ Descargar
+                </button>
+              )}
             </div>
 
             {/* Flecha siguiente */}

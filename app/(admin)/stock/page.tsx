@@ -1,5 +1,5 @@
-import EnDesarrollo from "@/components/EnDesarrollo";
+import EnDesarrolloPlay from "@/components/EnDesarrolloPlay";
 
 export default function UbicacionesPage() {
-  return <EnDesarrollo />;
+  return <EnDesarrolloPlay />;
 }

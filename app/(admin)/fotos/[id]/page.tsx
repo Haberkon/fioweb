@@ -160,7 +160,7 @@ export default function FotosObraDetalle() {
 const imgBlob = await response.blob();
 const img = await createImageBitmap(imgBlob);
 
-const bannerHeight = 420;
+const bannerHeight = 600;
 const canvas = document.createElement("canvas");
 canvas.width = img.width;
 canvas.height = img.height;
@@ -176,7 +176,7 @@ ctx.fillRect(0, img.height - bannerHeight, img.width, bannerHeight);
 // Texto
 ctx.fillStyle = "white";
 ctx.font = "bold 70px sans-serif";
-const baseY = img.height - bannerHeight + 90;
+const baseY = img.height - bannerHeight + 120;
 const line = 65;
 
 ctx.fillText(`Nombre: ${foto.nombre ?? "-"}`, 60, baseY);

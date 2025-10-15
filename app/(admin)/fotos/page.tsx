@@ -222,7 +222,7 @@ const handleDownloadConGeo = async (obraId: string, tipo: "ayer" | "hoy" | "tota
 const imgBlob = await fetch(data.signedUrl).then((r) => r.blob());
 const img = await createImageBitmap(imgBlob);
 
-const bannerHeight = 420; // altura visible del rectángulo negro
+const bannerHeight = 600; // altura visible del rectángulo negro
 const canvas = document.createElement("canvas");
 canvas.width = img.width;
 canvas.height = img.height; // sin extra — evita doble franja
@@ -238,7 +238,7 @@ ctx.fillRect(0, img.height - bannerHeight, img.width, bannerHeight);
 // Texto blanco
 ctx.fillStyle = "white";
 ctx.font = "bold 70px sans-serif";
-const baseY = img.height - bannerHeight + 90;
+const baseY = img.height - bannerHeight + 120;
 const line = 65;
 
 ctx.fillText(`Nombre: ${f.nombre ?? "-"}`, 60, baseY);

@@ -171,7 +171,7 @@ export default function AdminHome() {
   if (loading)
     return (
       <div className="p-8 text-gray-600 text-center">
-        Cargando información...
+        Cargando Home...
       </div>
     );
 

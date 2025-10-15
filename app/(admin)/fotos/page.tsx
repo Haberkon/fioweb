@@ -219,47 +219,51 @@ const handleDownloadConGeo = async (obraId: string, tipo: "ayer" | "hoy" | "tota
       }
 
       // Crear imagen con banner
-      const imgBlob = await fetch(data.signedUrl).then((r) => r.blob());
-      const img = await createImageBitmap(imgBlob);
+const imgBlob = await fetch(data.signedUrl).then((r) => r.blob());
+const img = await createImageBitmap(imgBlob);
 
-      const extra = 700;
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height + extra;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) continue;
+const bannerHeight = 420; // altura visible del rectángulo negro
+const canvas = document.createElement("canvas");
+canvas.width = img.width;
+canvas.height = img.height; // sin extra — evita doble franja
+const ctx = canvas.getContext("2d");
+if (!ctx) continue;
 
-      ctx.drawImage(img, 0, 0);
-      ctx.fillStyle = "rgba(0,0,0,0.6)";
-      ctx.fillRect(0, img.height - extra, img.width, extra);
-      ctx.fillStyle = "white";
-      ctx.font = "bold 90px sans-serif";
-      const baseY = img.height - extra + 140;
-      const line = 90;
+ctx.drawImage(img, 0, 0);
 
-      ctx.fillText(`Nombre: ${f.nombre ?? "-"}`, 60, baseY);
-      ctx.fillText(`Categoría: ${f.categoria ?? "-"}`, 60, baseY + line);
-      ctx.fillText(
-        `Fecha y hora: ${
-          f.tomado_en ? new Date(f.tomado_en).toLocaleString("es-AR") : "-"
-        }`,
-        60,
-        baseY + line * 2
-      );
-      ctx.fillText(
-        `Ubicación: ${
-          f.lat && f.lon ? `${f.lat.toFixed(6)}, ${f.lon.toFixed(6)}` : "Sin datos"
-        }`,
-        60,
-        baseY + line * 3
-      );
+// Fondo negro translúcido
+ctx.fillStyle = "rgba(0,0,0,0.6)";
+ctx.fillRect(0, img.height - bannerHeight, img.width, bannerHeight);
 
-      const direccionCorta = direccionCompleta
-        ? direccionCompleta.split(",").slice(0, 3).join(",")
-        : "Sin dirección disponible";
-      ctx.fillText(`Dirección: ${direccionCorta}`, 60, baseY + line * 4);
+// Texto blanco
+ctx.fillStyle = "white";
+ctx.font = "bold 70px sans-serif";
+const baseY = img.height - bannerHeight + 90;
+const line = 65;
 
-      ctx.fillText(`Técnico: ${tecnicoNombre || "Desconocido"}`, 60, baseY + line * 5);
+ctx.fillText(`Nombre: ${f.nombre ?? "-"}`, 60, baseY);
+ctx.fillText(`Categoría: ${f.categoria ?? "-"}`, 60, baseY + line);
+ctx.fillText(
+  `Fecha y hora: ${
+    f.tomado_en ? new Date(f.tomado_en).toLocaleString("es-AR") : "-"
+  }`,
+  60,
+  baseY + line * 2
+);
+ctx.fillText(
+  `Ubicación: ${
+    f.lat && f.lon ? `${f.lat.toFixed(6)}, ${f.lon.toFixed(6)}` : "Sin datos"
+  }`,
+  60,
+  baseY + line * 3
+);
+
+const direccionCorta = direccionCompleta
+  ? direccionCompleta.split(",").slice(0, 3).join(",")
+  : "Sin dirección disponible";
+ctx.fillText(`Dirección: ${direccionCorta}`, 60, baseY + line * 4);
+
+ctx.fillText(`Técnico: ${tecnicoNombre || "Desconocido"}`, 60, baseY + line * 5);
 
       // Convertir a blob y agregar al ZIP
       const blobFinal = await new Promise<Blob>((res) =>

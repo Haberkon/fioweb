@@ -155,51 +155,56 @@ export default function FotosObraDetalle() {
           : "Desconocido";
       }
 
+      
       const response = await fetch(foto.url);
-      const imgBlob = await response.blob();
-      const img = await createImageBitmap(imgBlob);
+const imgBlob = await response.blob();
+const img = await createImageBitmap(imgBlob);
 
-      const extra = 700;
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height + extra;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+const bannerHeight = 420;
+const canvas = document.createElement("canvas");
+canvas.width = img.width;
+canvas.height = img.height;
+const ctx = canvas.getContext("2d");
+if (!ctx) return;
 
-      ctx.drawImage(img, 0, 0);
-      ctx.fillStyle = "rgba(0,0,0,0.6)";
-      ctx.fillRect(0, img.height - extra, img.width, extra);
-      ctx.fillStyle = "white";
-      ctx.font = "bold 90px sans-serif";
-      const baseY = img.height - extra + 140;
-      const line = 90;
+ctx.drawImage(img, 0, 0);
 
-      ctx.fillText(`Nombre: ${foto.nombre ?? "-"}`, 60, baseY);
-      ctx.fillText(`Categoría: ${foto.categoria ?? "-"}`, 60, baseY + line);
-      ctx.fillText(
-        `Fecha: ${
-          foto.tomado_en
-            ? new Date(foto.tomado_en).toLocaleString("es-AR")
-            : "-"
-        }`,
-        60,
-        baseY + line * 2
-      );
-      ctx.fillText(
-        `Ubicación: ${
-          foto.lat && foto.lon
-            ? `${foto.lat.toFixed(6)}, ${foto.lon.toFixed(6)}`
-            : "Sin datos"
-        }`,
-        60,
-        baseY + line * 3
-      );
+// Fondo negro translúcido
+ctx.fillStyle = "rgba(0,0,0,0.6)";
+ctx.fillRect(0, img.height - bannerHeight, img.width, bannerHeight);
 
-      const direccionCorta = direccionCompleta
-        ? direccionCompleta.split(",").slice(0, 3).join(",")
-        : "Sin dirección disponible";
-      ctx.fillText(`Dirección: ${direccionCorta}`, 60, baseY + line * 4);
-      ctx.fillText(`Técnico: ${tecnicoNombre}`, 60, baseY + line * 5);
+// Texto
+ctx.fillStyle = "white";
+ctx.font = "bold 70px sans-serif";
+const baseY = img.height - bannerHeight + 90;
+const line = 65;
+
+ctx.fillText(`Nombre: ${foto.nombre ?? "-"}`, 60, baseY);
+ctx.fillText(`Categoría: ${foto.categoria ?? "-"}`, 60, baseY + line);
+ctx.fillText(
+  `Fecha y hora: ${
+    foto.tomado_en ? new Date(foto.tomado_en).toLocaleString("es-AR") : "-"
+  }`,
+  60,
+  baseY + line * 2
+);
+ctx.fillText(
+  `Ubicación: ${
+    foto.lat && foto.lon
+      ? `${foto.lat.toFixed(6)}, ${foto.lon.toFixed(6)}`
+      : "Sin datos"
+  }`,
+  60,
+  baseY + line * 3
+);
+
+const direccionCorta = direccionCompleta
+  ? direccionCompleta.split(",").slice(0, 3).join(",")
+  : "Sin dirección disponible";
+ctx.fillText(`Dirección: ${direccionCorta}`, 60, baseY + line * 4);
+
+ctx.fillText(`Técnico: ${tecnicoNombre || "Desconocido"}`, 60, baseY + line * 5);
+
 
       const blobFinal = await new Promise<Blob>((res) =>
         canvas.toBlob((b) => res(b!), "image/jpeg", 0.9)

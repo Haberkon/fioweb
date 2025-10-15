@@ -347,7 +347,7 @@ export default function FotosObrasPage() {
               }}
               className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-all duration-200 w-[140px] whitespace-nowrap"
             >
-              Descarga con datos
+              Descarga datos
             </button>
           </div>
         </td>

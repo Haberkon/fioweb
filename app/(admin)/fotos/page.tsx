@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -21,13 +22,13 @@ export default function FotosObrasPage() {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
 
-  // 🔹 Modal y progreso
   const [showModal, setShowModal] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [mensaje, setMensaje] = useState("Preparando descarga...");
-  const cancelRef = useRef<boolean>(false); // para poder cancelar desde el modal
+  const cancelRef = useRef<boolean>(false);
 
+  // 🔹 Obtener obras y conteos
   useEffect(() => {
     const fetchObras = async () => {
       setLoading(true);
@@ -92,7 +93,7 @@ export default function FotosObrasPage() {
     fetchObras();
   }, []);
 
-  // 🔹 Descargar fotos con cancelación real
+  // 🔹 Descarga simple
   const handleDownload = async (obraId: string, tipo: "hoy" | "ayer" | "total") => {
     setDownloading(obraId + tipo);
     cancelRef.current = false;
@@ -126,44 +127,123 @@ export default function FotosObrasPage() {
       const zip = new JSZip();
       let processed = 0;
       for (const f of fotos) {
-        if (cancelRef.current) throw new Error("cancelado"); // ⚠️ cancelar proceso
+        if (cancelRef.current) throw new Error("cancelado");
         const { data } = await supabase.storage.from("fotos").createSignedUrl(f.storage_path, 3600);
         if (!data?.signedUrl) continue;
 
-        const response = await fetch(data.signedUrl);
-        const blob = await response.blob();
-        const nombre = f.storage_path.split("/").pop() || `${f.id}.jpg`;
-        zip.file(nombre, blob);
+        const blob = await (await fetch(data.signedUrl)).blob();
+        zip.file(f.storage_path.split("/").pop() || `${f.id}.jpg`, blob);
 
         processed++;
-        const porcentaje = Math.min(100, Math.round((processed / fotos.length) * 100));
-        setProgress(porcentaje);
+        setProgress(Math.min(100, Math.round((processed / fotos.length) * 100)));
         setMensaje(`Procesando ${processed} de ${fotos.length} fotos...`);
       }
 
-      if (cancelRef.current) throw new Error("cancelado");
-
-      setMensaje("Generando archivo ZIP...");
       const zipBlob = await zip.generateAsync({ type: "blob" });
       saveAs(zipBlob, `Fotos_${tipo}_${obraId}.zip`);
-
-      setProgress(100);
       setStatus("success");
       setMensaje("✅ Descarga completada correctamente.");
     } catch (e) {
-      if ((e as Error).message === "cancelado") {
-        setMensaje("Descarga cancelada por el usuario.");
-      } else {
-        console.error("Error descargando fotos:", e);
-        setMensaje("❌ Error al generar la descarga.");
-      }
       setStatus("error");
+      setMensaje("❌ Error al generar la descarga.");
     } finally {
       setDownloading(null);
     }
   };
 
-  // 🔹 Cancelar proceso
+  // 🔹 Descarga con datos
+  const handleDownloadConGeo = async (obraId: string, tipo: "ayer" | "hoy" | "total") => {
+    setShowModal(true);
+    setProgress(0);
+    setStatus("loading");
+    setMensaje(`Generando imágenes con datos (${tipo})...`);
+
+    try {
+      const hoy = new Date();
+      const ayer = new Date(hoy);
+      ayer.setDate(hoy.getDate() - 1);
+
+      const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0);
+      const finHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
+      const inicioAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 0, 0, 0);
+      const finAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 23, 59, 59);
+
+      let query = supabase
+        .from("foto")
+        .select("id, storage_path, nombre, categoria, tomado_en, lat, lon, tecnico_id")
+        .eq("obra_id", obraId);
+
+      if (tipo === "hoy")
+        query = query.gte("tomado_en", inicioHoy.toISOString()).lte("tomado_en", finHoy.toISOString());
+      if (tipo === "ayer")
+        query = query.gte("tomado_en", inicioAyer.toISOString()).lte("tomado_en", finAyer.toISOString());
+
+      const { data: fotos } = await query;
+      if (!fotos?.length) {
+        setMensaje(`No hay fotos disponibles para ${tipo}.`);
+        setStatus("error");
+        return;
+      }
+
+      const zip = new JSZip();
+      let i = 0;
+
+      for (const f of fotos) {
+        const { data } = await supabase.storage.from("fotos").createSignedUrl(f.storage_path, 3600);
+        if (!data?.signedUrl) continue;
+
+        const imgBlob = await fetch(data.signedUrl).then((r) => r.blob());
+        const img = await createImageBitmap(imgBlob);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height + 300;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) continue;
+
+        ctx.drawImage(img, 0, 0);
+        const bannerOffset = 600;
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(0, img.height - bannerOffset, img.width, 600);
+        ctx.fillStyle = "white";
+        ctx.font = "96px sans-serif";
+        const baseY = img.height - bannerOffset + 150;
+        const line = 90;
+
+        ctx.fillText(`Nombre: ${f.nombre ?? "-"}`, 60, baseY);
+        ctx.fillText(`Categoría: ${f.categoria ?? "-"}`, 60, baseY + line);
+        ctx.fillText(
+          `Fecha y hora: ${
+            f.tomado_en ? new Date(f.tomado_en).toLocaleString("es-AR") : "-"
+          }`,
+          60,
+          baseY + line * 2
+        );
+        ctx.fillText(`Ubicación: ${f.lat && f.lon ? `${f.lat.toFixed(6)}, ${f.lon.toFixed(6)}` : "Sin datos"}`, 60, baseY + line * 3);
+
+        const blobFinal = await new Promise<Blob>((res) =>
+          canvas.toBlob((b) => res(b!), "image/jpeg", 0.9)
+        );
+
+        zip.file(f.storage_path.split("/").pop() || `${f.id}.jpg`, blobFinal);
+
+        i++;
+        setProgress(Math.round((i / fotos.length) * 100));
+        setMensaje(`Procesando ${i} de ${fotos.length} fotos (${tipo})...`);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      saveAs(zipBlob, `FotosConDatos_${tipo}_${obraId}.zip`);
+      setStatus("success");
+      setMensaje(`✅ Descarga completa (${tipo})`);
+    } catch {
+      setStatus("error");
+      setMensaje("❌ Error al generar imágenes con datos.");
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   const handleCancel = () => {
     cancelRef.current = true;
     setShowModal(false);
@@ -173,112 +253,150 @@ export default function FotosObrasPage() {
 
   if (loading) return <p className="p-6">Cargando...</p>;
 
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Galería por Obra</h1>
+ return (
+  <div className="p-6">
+    <h1 className="text-2xl font-semibold mb-6 text-gray-800">Galería por Obra</h1>
 
-      {obras.length === 0 ? (
-        <p className="text-gray-500">No hay obras registradas.</p>
-      ) : (
-        <div className="bg-white rounded shadow p-4 overflow-x-auto">
-          <table className="w-full border min-w-[1100px]">
-            <thead className="bg-gray-100">
+    {obras.length === 0 ? (
+      <p className="text-gray-500 text-sm">No hay obras registradas.</p>
+    ) : (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1100px] text-sm text-gray-800">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="p-2 border text-center">N° Obra</th>
-                <th className="p-2 border text-left">Nombre</th>
-                <th className="p-2 border text-center w-[180px]">Última captura</th>
-                <th className="p-2 border text-center">Ayer</th>
-                <th className="p-2 border text-center">Hoy</th>
-                <th className="p-2 border text-center">Total</th>
-                <th className="p-2 border text-center w-[120px]">Desc. (Ayer)</th>
-                <th className="p-2 border text-center w-[120px]">Desc. (Hoy)</th>
-                <th className="p-2 border text-center w-[120px]">Desc. (Total)</th>
+                <th className="py-2 px-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">N° Obra</th>
+                <th className="py-2 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Nombre</th>
+                <th className="py-2 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Última captura</th>
+                <th className="py-2 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Ayer</th>
+                <th className="py-2 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Hoy</th>
+                <th className="py-2 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+                <th className="py-2 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Desc. (Ayer)</th>
+                <th className="py-2 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Desc. (Hoy)</th>
+                <th className="py-2 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Desc. (Total)</th>
               </tr>
             </thead>
-            <tbody>
-              {obras.map((o) => (
-                <tr key={o.id} className="hover:bg-gray-50 transition">
-                  <td className="p-2 border text-center">{o.numero_obra ?? "-"}</td>
-                  <td className="p-2 border">
-                    <Link href={`/fotos/${o.id}`} className="text-blue-600 hover:underline">
-                      {o.nombre}
-                    </Link>
-                  </td>
-                  <td className="p-2 border text-center text-gray-700 w-[180px]">
-                    {o.ultima_captura
-                      ? new Date(o.ultima_captura).toLocaleString("es-AR", {
-                          weekday: "long",
-                          day: "2-digit",
-                          month: "short",
-                          year: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: true,
-                        })
-                          .replace(".", "")
-                          .replace(",", "")
-                          .replace(/(\d{2}) (\w{3})/, "$1/$2")
-                      : "-"}
-                  </td>
-                  <td className="p-2 border text-center">{o.fotos_ayer}</td>
-                  <td className="p-2 border text-center">{o.fotos_hoy}</td>
-                  <td className="p-2 border text-center font-semibold">{o.fotos_count}</td>
+           <tbody>
+  {obras.map((o, idx) => (
+    <tr
+      key={o.id}
+      onClick={() => (window.location.href = `/fotos/${o.id}`)}
+      className={`${idx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"} hover:bg-blue-50/50 transition-colors duration-150 cursor-pointer`}
+    >
+      <td className="py-2 px-2 text-center text-gray-700">{o.numero_obra ?? "-"}</td>
 
-                  {/* Botones de descarga */}
-                  {["ayer", "hoy", "total"].map((tipo) => (
-                    <td key={tipo} className="p-2 border text-center w-[120px]">
-                      <button
-                        onClick={() => handleDownload(o.id, tipo as "ayer" | "hoy" | "total")}
-                        disabled={downloading === o.id + tipo}
-                        className="text-sm text-blue-600 hover:underline disabled:opacity-50"
-                      >
-                        {downloading === o.id + tipo ? "..." : "Descargar"}
-                      </button>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <td className="py-2 px-4 whitespace-nowrap">
+        <Link
+          href={`/fotos/${o.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
+        >
+          {o.nombre}
+        </Link>
+      </td>
 
-      {/* 🔹 Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm text-center">
-            <h2 className="text-lg font-semibold mb-2">
-              {status === "loading" && "Descargando fotos..."}
-              {status === "success" && "Descarga completa"}
-              {status === "error" && "Proceso detenido"}
-            </h2>
+      <td className="py-2 px-4 text-center text-gray-600 leading-tight">
+        {o.ultima_captura ? (
+          <>
+            <div>
+              {new Date(o.ultima_captura).toLocaleDateString("es-AR", {
+                weekday: "short",
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
+            </div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              {new Date(o.ultima_captura).toLocaleTimeString("es-AR", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+              })}
+            </div>
+          </>
+        ) : (
+          "-"
+        )}
+      </td>
 
-            {status === "loading" && (
-              <div className="w-full bg-gray-200 rounded-full h-3 mb-3 overflow-hidden">
-                <div
-                  className="bg-blue-500 h-3 transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                ></div>
-              </div>
-            )}
+      <td className="py-2 px-4 text-center">{o.fotos_ayer}</td>
+      <td className="py-2 px-4 text-center">{o.fotos_hoy}</td>
+      <td className="py-2 px-4 text-center font-semibold">{o.fotos_count}</td>
 
-            <p className="text-sm text-gray-700 mb-3">{mensaje}</p>
-
+      {["ayer", "hoy", "total"].map((tipo) => (
+        <td key={tipo} className="py-2 px-4 text-center">
+          <div className="flex flex-col items-center gap-1">
             <button
-              onClick={status === "loading" ? handleCancel : () => setShowModal(false)}
-              className={`mt-2 px-4 py-1 rounded ${
-                status === "success"
-                  ? "bg-green-600 text-white"
-                  : status === "error"
-                  ? "bg-red-600 text-white"
-                  : "bg-gray-300 text-gray-800"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDownload(o.id, tipo as "ayer" | "hoy" | "total");
+              }}
+              disabled={downloading === o.id + tipo}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 w-[120px] whitespace-nowrap ${
+                downloading === o.id + tipo
+                  ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                  : "bg-blue-100 text-blue-700 hover:bg-blue-200"
               }`}
             >
-              {status === "loading" ? "Cancelar" : "Cerrar"}
+              Descarga simple
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDownloadConGeo(o.id, tipo as "ayer" | "hoy" | "total");
+              }}
+              className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-all duration-200 w-[140px] whitespace-nowrap"
+            >
+              Descarga con datos
             </button>
           </div>
+        </td>
+      ))}
+    </tr>
+  ))}
+</tbody>
+
+          </table>
         </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+
+    {/* Modal */}
+    {showModal && (
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">
+          <h2 className="text-lg font-semibold mb-2 text-gray-800">
+            {status === "loading" && "Procesando imágenes..."}
+            {status === "success" && "Descarga completa"}
+            {status === "error" && "Proceso detenido"}
+          </h2>
+
+          {status === "loading" && (
+            <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4 overflow-hidden">
+              <div
+                className="bg-blue-500 h-2.5 transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              ></div>
+            </div>
+          )}
+
+          <p className="text-sm text-gray-600 mb-3">{mensaje}</p>
+
+          <button
+            onClick={status === "loading" ? handleCancel : () => setShowModal(false)}
+            className={`mt-2 px-5 py-2 rounded-full font-medium text-sm transition ${
+              status === "success"
+                ? "bg-green-600 text-white hover:bg-green-700"
+                : status === "error"
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "bg-gray-300 text-gray-800 hover:bg-gray-400"
+            }`}
+          >
+            {status === "loading" ? "Cancelar" : "Cerrar"}
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+);
 }

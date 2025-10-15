@@ -43,7 +43,23 @@ const navItems = [
 // 🔹 Tabla de permisos por rol
 const permisosPorRol: Record<string, "all" | string[]> = {
   superadmin: "all",
-  admin: "all",
+  admin: [
+    "/home",
+    "/obras",
+    "/materiales",
+    "/planos",
+    "/fotos",
+    "/asignacionObras",
+    "/asignacionMateriales",
+    // No navbar - Aqui debajo
+    "/asignarMateriales",
+    "/consumo",
+    // No navbar - Aqui debajo
+    "/registrarConsumo",
+    "/perfil",
+    // "/admins",
+    "/tecnicos",
+  ],
   deposito: [
     "/home",
     "/obras",
@@ -54,9 +70,11 @@ const permisosPorRol: Record<string, "all" | string[]> = {
     // "/ubicaciones",
     "/asignacionObras",
     "/asignacionMateriales",
-    // No navbar - "/asignarMateriales",
+    // No navbar - Aqui debajo
+    "/asignarMateriales",
     "/consumo",
-    // No navbar - "/registrarConsumo",
+    // No navbar - Aqui debajo
+    "/registrarConsumo",
     "/perfil",
     // "/admins",
     // "/tecnicos",
@@ -71,7 +89,9 @@ const permisosPorRol: Record<string, "all" | string[]> = {
     // "/ubicaciones",
     // "/asignacionObras",
     // "/asignacionMateriales",
-    // "/consumo",
+    // No navbar - "/asignarMateriales",
+    "/consumo",
+    // No navbar - "/registrarConsumo",
     "/perfil",
     // "/admins",
     // "/tecnicos",
@@ -115,27 +135,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   // 🔒 Control de acceso por rol
- useEffect(() => {
-  if (!rol || pathname === "/denegado") return;
+    useEffect(() => {
+      if (!rol) return; // Esperar a que cargue el rol
+      if (pathname === "/denegado" || pathname === "/login") return;
 
-  const permisos = permisosPorRol[rol];
-  console.log("ROL DETECTADO:", rol);
-  console.log("PATHNAME:", pathname);
-  console.log("PERMISOS:", permisos);
+      const permisos = permisosPorRol[rol];
+      if (!permisos) {
+        router.push("/denegado");
+        return;
+      }
 
-  if (permisos === "all") return;
-  if (!permisos || permisos.length === 0) {
-    router.push("/denegado");
-    return;
-  }
+      if (permisos === "all") return;
 
-  const tienePermiso = permisos.some((ruta) => pathname.includes(ruta));
-  console.log("TIENE PERMISO?", tienePermiso);
+      const tienePermiso = permisos.some((ruta) => pathname.startsWith(ruta));
 
-  if (!tienePermiso) {
-    router.push("/denegado");
-  }
-}, [rol, pathname, router]);
+      if (!tienePermiso) {
+        router.push("/denegado");
+      }
+    }, [rol, pathname, router]);
 
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import JSZip from "jszip";
@@ -21,10 +21,16 @@ export default function FotosObrasPage() {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
 
+  // 🔹 Modal y progreso
+  const [showModal, setShowModal] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [mensaje, setMensaje] = useState("Preparando descarga...");
+  const cancelRef = useRef<boolean>(false); // para poder cancelar desde el modal
+
   useEffect(() => {
     const fetchObras = async () => {
       setLoading(true);
-
       const { data: obrasData, error: e1 } = await supabase
         .from("obra")
         .select("id, nombre, numero_obra")
@@ -52,7 +58,6 @@ export default function FotosObrasPage() {
 
       const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0).getTime();
       const finHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59).getTime();
-
       const inicioAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 0, 0, 0).getTime();
       const finAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 23, 59, 59).getTime();
 
@@ -61,20 +66,15 @@ export default function FotosObrasPage() {
       (fotosData ?? []).forEach((f) => {
         const obraId = f.obra_id;
         if (!obraId || !f.tomado_en) return;
-
-        if (!counts[obraId]) {
-          counts[obraId] = { total: 0, hoy: 0, ayer: 0, ultima: null };
-        }
+        if (!counts[obraId]) counts[obraId] = { total: 0, hoy: 0, ayer: 0, ultima: null };
 
         const fecha = new Date(f.tomado_en).getTime();
-
         counts[obraId].total += 1;
         if (fecha >= inicioHoy && fecha <= finHoy) counts[obraId].hoy += 1;
         else if (fecha >= inicioAyer && fecha <= finAyer) counts[obraId].ayer += 1;
 
-        if (!counts[obraId].ultima || f.tomado_en > counts[obraId].ultima) {
+        if (!counts[obraId].ultima || f.tomado_en > counts[obraId].ultima)
           counts[obraId].ultima = f.tomado_en;
-        }
       });
 
       const merged = (obrasData ?? []).map((o) => ({
@@ -92,9 +92,14 @@ export default function FotosObrasPage() {
     fetchObras();
   }, []);
 
-  // 🔹 Descargar fotos de una obra según tipo
+  // 🔹 Descargar fotos con cancelación real
   const handleDownload = async (obraId: string, tipo: "hoy" | "ayer" | "total") => {
     setDownloading(obraId + tipo);
+    cancelRef.current = false;
+    setShowModal(true);
+    setProgress(0);
+    setStatus("loading");
+    setMensaje("Preparando descarga...");
 
     try {
       const hoy = new Date();
@@ -106,21 +111,22 @@ export default function FotosObrasPage() {
       const inicioAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 0, 0, 0);
       const finAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 23, 59, 59);
 
-      // 🔹 Filtro dinámico
       let query = supabase.from("foto").select("id, storage_path, tomado_en").eq("obra_id", obraId);
       if (tipo === "hoy") query = query.gte("tomado_en", inicioHoy.toISOString()).lte("tomado_en", finHoy.toISOString());
       if (tipo === "ayer") query = query.gte("tomado_en", inicioAyer.toISOString()).lte("tomado_en", finAyer.toISOString());
 
       const { data: fotos, error } = await query;
-
       if (error || !fotos?.length) {
-        alert("No hay fotos para descargar en este rango.");
+        setMensaje("No hay fotos disponibles en este rango.");
+        setStatus("error");
         setDownloading(null);
         return;
       }
 
       const zip = new JSZip();
+      let processed = 0;
       for (const f of fotos) {
+        if (cancelRef.current) throw new Error("cancelado"); // ⚠️ cancelar proceso
         const { data } = await supabase.storage.from("fotos").createSignedUrl(f.storage_path, 3600);
         if (!data?.signedUrl) continue;
 
@@ -128,16 +134,41 @@ export default function FotosObrasPage() {
         const blob = await response.blob();
         const nombre = f.storage_path.split("/").pop() || `${f.id}.jpg`;
         zip.file(nombre, blob);
+
+        processed++;
+        const porcentaje = Math.min(100, Math.round((processed / fotos.length) * 100));
+        setProgress(porcentaje);
+        setMensaje(`Procesando ${processed} de ${fotos.length} fotos...`);
       }
 
+      if (cancelRef.current) throw new Error("cancelado");
+
+      setMensaje("Generando archivo ZIP...");
       const zipBlob = await zip.generateAsync({ type: "blob" });
       saveAs(zipBlob, `Fotos_${tipo}_${obraId}.zip`);
+
+      setProgress(100);
+      setStatus("success");
+      setMensaje("✅ Descarga completada correctamente.");
     } catch (e) {
-      console.error("Error descargando fotos:", e);
-      alert("Error al generar la descarga.");
+      if ((e as Error).message === "cancelado") {
+        setMensaje("Descarga cancelada por el usuario.");
+      } else {
+        console.error("Error descargando fotos:", e);
+        setMensaje("❌ Error al generar la descarga.");
+      }
+      setStatus("error");
     } finally {
       setDownloading(null);
     }
+  };
+
+  // 🔹 Cancelar proceso
+  const handleCancel = () => {
+    cancelRef.current = true;
+    setShowModal(false);
+    setDownloading(null);
+    setProgress(0);
   };
 
   if (loading) return <p className="p-6">Cargando...</p>;
@@ -159,9 +190,9 @@ export default function FotosObrasPage() {
                 <th className="p-2 border text-center">Ayer</th>
                 <th className="p-2 border text-center">Hoy</th>
                 <th className="p-2 border text-center">Total</th>
-                <th className="p-2 border text-center w-[100px]">Descargar (Ayer)</th>
-                <th className="p-2 border text-center w-[100px]">Descargar (Hoy)</th>
-                <th className="p-2 border text-center w-[100px]">Descargar (Total)</th>
+                <th className="p-2 border text-center w-[120px]">Desc. (Ayer)</th>
+                <th className="p-2 border text-center w-[120px]">Desc. (Hoy)</th>
+                <th className="p-2 border text-center w-[120px]">Desc. (Total)</th>
               </tr>
             </thead>
             <tbody>
@@ -183,7 +214,10 @@ export default function FotosObrasPage() {
                           hour: "2-digit",
                           minute: "2-digit",
                           hour12: true,
-                        }).replace(".", "").replace(",", "").replace(/(\d{2}) (\w{3})/, "$1/$2")
+                        })
+                          .replace(".", "")
+                          .replace(",", "")
+                          .replace(/(\d{2}) (\w{3})/, "$1/$2")
                       : "-"}
                   </td>
                   <td className="p-2 border text-center">{o.fotos_ayer}</td>
@@ -191,37 +225,58 @@ export default function FotosObrasPage() {
                   <td className="p-2 border text-center font-semibold">{o.fotos_count}</td>
 
                   {/* Botones de descarga */}
-                  <td className="p-2 border text-center w-[100px]">
-                    <button
-                      onClick={() => handleDownload(o.id, "ayer")}
-                      disabled={downloading === o.id + "ayer"}
-                      className="text-sm text-blue-600 hover:underline disabled:opacity-50"
-                    >
-                      {downloading === o.id + "ayer" ? "..." : "Descargar"}
-                    </button>
-                  </td>
-                  <td className="p-2 border text-center w-[100px]">
-                    <button
-                      onClick={() => handleDownload(o.id, "hoy")}
-                      disabled={downloading === o.id + "hoy"}
-                      className="text-sm text-blue-600 hover:underline disabled:opacity-50"
-                    >
-                      {downloading === o.id + "hoy" ? "..." : "Descargar"}
-                    </button>
-                  </td>
-                  <td className="p-2 border text-center w-[100px]">
-                    <button
-                      onClick={() => handleDownload(o.id, "total")}
-                      disabled={downloading === o.id + "total"}
-                      className="text-sm text-blue-600 hover:underline disabled:opacity-50"
-                    >
-                      {downloading === o.id + "total" ? "..." : "Descargar"}
-                    </button>
-                  </td>
+                  {["ayer", "hoy", "total"].map((tipo) => (
+                    <td key={tipo} className="p-2 border text-center w-[120px]">
+                      <button
+                        onClick={() => handleDownload(o.id, tipo as "ayer" | "hoy" | "total")}
+                        disabled={downloading === o.id + tipo}
+                        className="text-sm text-blue-600 hover:underline disabled:opacity-50"
+                      >
+                        {downloading === o.id + tipo ? "..." : "Descargar"}
+                      </button>
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* 🔹 Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm text-center">
+            <h2 className="text-lg font-semibold mb-2">
+              {status === "loading" && "Descargando fotos..."}
+              {status === "success" && "Descarga completa"}
+              {status === "error" && "Proceso detenido"}
+            </h2>
+
+            {status === "loading" && (
+              <div className="w-full bg-gray-200 rounded-full h-3 mb-3 overflow-hidden">
+                <div
+                  className="bg-blue-500 h-3 transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                ></div>
+              </div>
+            )}
+
+            <p className="text-sm text-gray-700 mb-3">{mensaje}</p>
+
+            <button
+              onClick={status === "loading" ? handleCancel : () => setShowModal(false)}
+              className={`mt-2 px-4 py-1 rounded ${
+                status === "success"
+                  ? "bg-green-600 text-white"
+                  : status === "error"
+                  ? "bg-red-600 text-white"
+                  : "bg-gray-300 text-gray-800"
+              }`}
+            >
+              {status === "loading" ? "Cancelar" : "Cerrar"}
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -199,7 +199,7 @@ export default function TecnicosPage() {
     }
   };
 
-  if (loading) return <div className="p-6 text-gray-600">Cargando...</div>;
+    if (loading) return <div className="p-6 text-gray-600">Cargando...</div>;
 
   return (
     <div className="p-6 space-y-10">
@@ -283,6 +283,71 @@ export default function TecnicosPage() {
           ))}
         </tbody>
       </table>
+
+      {/* 🔐 Modal Cambiar Contraseña */}
+      {showModal && (
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50"
+          style={{ backgroundColor: "rgba(0,0,0,0.2)" }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-gray-200 space-y-5">
+            <h2 className="text-lg font-semibold text-gray-800 mb-2">
+              Cambiar Contraseña
+            </h2>
+
+            <div className="space-y-3">
+              <div className="relative">
+                <input
+                  type={showPass ? "text" : "password"}
+                  className="border p-2 rounded w-full"
+                  placeholder="Nueva contraseña"
+                  value={newPass}
+                  onChange={(e) => setNewPass(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass((p) => !p)}
+                  className="absolute right-3 top-3 text-gray-500 hover:text-gray-700"
+                >
+                  {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+
+              <div className="relative">
+                <input
+                  type={showPass ? "text" : "password"}
+                  className="border p-2 rounded w-full"
+                  placeholder="Confirmar contraseña"
+                  value={confirmPass}
+                  onChange={(e) => setConfirmPass(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass((p) => !p)}
+                  className="absolute right-3 top-3 text-gray-500 hover:text-gray-700"
+                >
+                  {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 rounded border border-gray-400 text-gray-600 hover:bg-gray-100 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmPasswordChange}
+                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ➕ Modal Crear Técnico */}
       {showCreateModal && (

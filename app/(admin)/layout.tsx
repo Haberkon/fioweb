@@ -38,6 +38,7 @@ const navItems = [
   { href: "/perfil", label: "Mi Perfil", icon: UserIcon },
   { href: "/tecnicos", label: "Técnicos", icon: UserCircleIcon },
   { href: "/admins", label: "Admins", icon: UsersIcon },
+  { href: "/galeria", label: "Galería", icon: PhotoIcon },
 ];
 
 // 🔹 Tabla de permisos por rol

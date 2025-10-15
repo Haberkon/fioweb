@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 type Obra = {
   id: string;
@@ -17,12 +19,12 @@ type Obra = {
 export default function FotosObrasPage() {
   const [obras, setObras] = useState<Obra[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchObras = async () => {
       setLoading(true);
 
-      // 🔹 Traer obras
       const { data: obrasData, error: e1 } = await supabase
         .from("obra")
         .select("id, nombre, numero_obra")
@@ -34,7 +36,6 @@ export default function FotosObrasPage() {
         return;
       }
 
-      // 🔹 Traer fotos (obra_id + tomado_en)
       const { data: fotosData, error: e2 } = await supabase
         .from("foto")
         .select("obra_id, tomado_en");
@@ -45,50 +46,17 @@ export default function FotosObrasPage() {
         return;
       }
 
-      // 🔹 Preparar fechas de referencia
       const hoy = new Date();
       const ayer = new Date(hoy);
       ayer.setDate(hoy.getDate() - 1);
 
-      const inicioHoy = new Date(
-        hoy.getFullYear(),
-        hoy.getMonth(),
-        hoy.getDate(),
-        0,
-        0,
-        0
-      ).getTime();
-      const finHoy = new Date(
-        hoy.getFullYear(),
-        hoy.getMonth(),
-        hoy.getDate(),
-        23,
-        59,
-        59
-      ).getTime();
+      const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0).getTime();
+      const finHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59).getTime();
 
-      const inicioAyer = new Date(
-        ayer.getFullYear(),
-        ayer.getMonth(),
-        ayer.getDate(),
-        0,
-        0,
-        0
-      ).getTime();
-      const finAyer = new Date(
-        ayer.getFullYear(),
-        ayer.getMonth(),
-        ayer.getDate(),
-        23,
-        59,
-        59
-      ).getTime();
+      const inicioAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 0, 0, 0).getTime();
+      const finAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 23, 59, 59).getTime();
 
-      // 🔹 Contadores por obra
-      const counts: Record<
-        string,
-        { total: number; hoy: number; ayer: number; ultima: string | null }
-      > = {};
+      const counts: Record<string, { total: number; hoy: number; ayer: number; ultima: string | null }> = {};
 
       (fotosData ?? []).forEach((f) => {
         const obraId = f.obra_id;
@@ -101,18 +69,14 @@ export default function FotosObrasPage() {
         const fecha = new Date(f.tomado_en).getTime();
 
         counts[obraId].total += 1;
-
         if (fecha >= inicioHoy && fecha <= finHoy) counts[obraId].hoy += 1;
-        else if (fecha >= inicioAyer && fecha <= finAyer)
-          counts[obraId].ayer += 1;
+        else if (fecha >= inicioAyer && fecha <= finAyer) counts[obraId].ayer += 1;
 
-        // Última captura
         if (!counts[obraId].ultima || f.tomado_en > counts[obraId].ultima) {
           counts[obraId].ultima = f.tomado_en;
         }
       });
 
-      // 🔹 Mezclar resultados
       const merged = (obrasData ?? []).map((o) => ({
         ...o,
         fotos_count: counts[o.id]?.total || 0,
@@ -128,6 +92,54 @@ export default function FotosObrasPage() {
     fetchObras();
   }, []);
 
+  // 🔹 Descargar fotos de una obra según tipo
+  const handleDownload = async (obraId: string, tipo: "hoy" | "ayer" | "total") => {
+    setDownloading(obraId + tipo);
+
+    try {
+      const hoy = new Date();
+      const ayer = new Date(hoy);
+      ayer.setDate(hoy.getDate() - 1);
+
+      const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0);
+      const finHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
+      const inicioAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 0, 0, 0);
+      const finAyer = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 23, 59, 59);
+
+      // 🔹 Filtro dinámico
+      let query = supabase.from("foto").select("id, storage_path, tomado_en").eq("obra_id", obraId);
+      if (tipo === "hoy") query = query.gte("tomado_en", inicioHoy.toISOString()).lte("tomado_en", finHoy.toISOString());
+      if (tipo === "ayer") query = query.gte("tomado_en", inicioAyer.toISOString()).lte("tomado_en", finAyer.toISOString());
+
+      const { data: fotos, error } = await query;
+
+      if (error || !fotos?.length) {
+        alert("No hay fotos para descargar en este rango.");
+        setDownloading(null);
+        return;
+      }
+
+      const zip = new JSZip();
+      for (const f of fotos) {
+        const { data } = await supabase.storage.from("fotos").createSignedUrl(f.storage_path, 3600);
+        if (!data?.signedUrl) continue;
+
+        const response = await fetch(data.signedUrl);
+        const blob = await response.blob();
+        const nombre = f.storage_path.split("/").pop() || `${f.id}.jpg`;
+        zip.file(nombre, blob);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      saveAs(zipBlob, `Fotos_${tipo}_${obraId}.zip`);
+    } catch (e) {
+      console.error("Error descargando fotos:", e);
+      alert("Error al generar la descarga.");
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   if (loading) return <p className="p-6">Cargando...</p>;
 
   return (
@@ -138,53 +150,73 @@ export default function FotosObrasPage() {
         <p className="text-gray-500">No hay obras registradas.</p>
       ) : (
         <div className="bg-white rounded shadow p-4 overflow-x-auto">
-          <table className="w-full border min-w-[800px]">
+          <table className="w-full border min-w-[1100px]">
             <thead className="bg-gray-100">
               <tr>
-                <th className="p-2 border text-left">N° Obra</th>
+                <th className="p-2 border text-center">N° Obra</th>
                 <th className="p-2 border text-left">Nombre</th>
-                <th className="p-2 border text-center w-[300px]">Última captura</th>
+                <th className="p-2 border text-center w-[180px]">Última captura</th>
                 <th className="p-2 border text-center">Ayer</th>
                 <th className="p-2 border text-center">Hoy</th>
                 <th className="p-2 border text-center">Total</th>
+                <th className="p-2 border text-center w-[100px]">Descargar (Ayer)</th>
+                <th className="p-2 border text-center w-[100px]">Descargar (Hoy)</th>
+                <th className="p-2 border text-center w-[100px]">Descargar (Total)</th>
               </tr>
             </thead>
             <tbody>
               {obras.map((o) => (
-                <tr
-                  key={o.id}
-                  className="hover:bg-gray-50 transition cursor-pointer"
-                >
+                <tr key={o.id} className="hover:bg-gray-50 transition">
                   <td className="p-2 border text-center">{o.numero_obra ?? "-"}</td>
                   <td className="p-2 border">
-                    <Link
-                      href={`/fotos/${o.id}`}
-                      className="text-blue-600 hover:underline"
-                    >
+                    <Link href={`/fotos/${o.id}`} className="text-blue-600 hover:underline">
                       {o.nombre}
                     </Link>
                   </td>
-                  <td className="p-2 border text-center text-gray-700 w-[300px]">
-                  {o.ultima_captura
-                    ? new Date(o.ultima_captura).toLocaleString("es-AR", {
-                        weekday: "long",
-                        day: "2-digit",
-                        month: "short",
-                        year: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: true,
-                      })
-                        .replace(".", "") // quita punto de 'oct.'
-                        .replace(",", "") // quita coma extra tras el día
-                        .replace(/(\d{2}) (\w{3})/, "$1/$2") // 14 Oct -> 14/Oct
-                        .replace(" ", " ") + " " // mantiene espacios normales
-                    : "-"}
-                </td>
+                  <td className="p-2 border text-center text-gray-700 w-[180px]">
+                    {o.ultima_captura
+                      ? new Date(o.ultima_captura).toLocaleString("es-AR", {
+                          weekday: "long",
+                          day: "2-digit",
+                          month: "short",
+                          year: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        }).replace(".", "").replace(",", "").replace(/(\d{2}) (\w{3})/, "$1/$2")
+                      : "-"}
+                  </td>
                   <td className="p-2 border text-center">{o.fotos_ayer}</td>
                   <td className="p-2 border text-center">{o.fotos_hoy}</td>
-                  <td className="p-2 border text-center font-semibold">
-                    {o.fotos_count}
+                  <td className="p-2 border text-center font-semibold">{o.fotos_count}</td>
+
+                  {/* Botones de descarga */}
+                  <td className="p-2 border text-center w-[100px]">
+                    <button
+                      onClick={() => handleDownload(o.id, "ayer")}
+                      disabled={downloading === o.id + "ayer"}
+                      className="text-sm text-blue-600 hover:underline disabled:opacity-50"
+                    >
+                      {downloading === o.id + "ayer" ? "..." : "Descargar"}
+                    </button>
+                  </td>
+                  <td className="p-2 border text-center w-[100px]">
+                    <button
+                      onClick={() => handleDownload(o.id, "hoy")}
+                      disabled={downloading === o.id + "hoy"}
+                      className="text-sm text-blue-600 hover:underline disabled:opacity-50"
+                    >
+                      {downloading === o.id + "hoy" ? "..." : "Descargar"}
+                    </button>
+                  </td>
+                  <td className="p-2 border text-center w-[100px]">
+                    <button
+                      onClick={() => handleDownload(o.id, "total")}
+                      disabled={downloading === o.id + "total"}
+                      className="text-sm text-blue-600 hover:underline disabled:opacity-50"
+                    >
+                      {downloading === o.id + "total" ? "..." : "Descargar"}
+                    </button>
                   </td>
                 </tr>
               ))}

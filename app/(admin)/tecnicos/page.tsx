@@ -60,7 +60,7 @@ export default function TecnicosPage() {
     load();
   }, []);
 
-  // Editar y guardar
+  // --- Edición ---
   const handleEdit = (id: string) => {
     const user = tecnicos.find((t) => t.id === id);
     if (user) setEditando((prev) => ({ ...prev, [id]: user }));
@@ -81,17 +81,45 @@ export default function TecnicosPage() {
   const handleSave = async (id: string) => {
     const changes = editando[id];
     if (!changes) return;
-    delete (changes as any).email;
 
-    const { error } = await supabase.from("app_user").update(changes).eq("id", id);
-    if (error) return alert("Error al actualizar: " + error.message);
+    const tecnico = tecnicos.find((t) => t.id === id);
+    if (!tecnico) return alert("Técnico no encontrado");
 
-    setTecnicos((a) => a.map((u) => (u.id === id ? { ...u, ...changes } : u)));
-    handleCancel(id);
-    alert("✅ Técnico actualizado");
+    try {
+      // 🔹 Si cambió el email → actualizar en Supabase Auth
+      if (changes.email && changes.email !== tecnico.email) {
+        const res = await fetch("/api/users", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            auth_user_id: tecnico.auth_user_id,
+            email: changes.email,
+          }),
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || "Error al actualizar correo");
+      }
+
+      // 🔹 Eliminar el campo email antes de actualizar en app_user
+      const { email, ...rest } = changes;
+      if (Object.keys(rest).length > 0) {
+        const { error } = await supabase.from("app_user").update(rest).eq("id", id);
+        if (error) throw new Error(error.message);
+      }
+
+      // 🔹 Actualizar estado local
+      setTecnicos((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, ...changes } : t))
+      );
+
+      handleCancel(id);
+      alert("✅ Técnico actualizado correctamente");
+    } catch (err: any) {
+      alert("❌ " + err.message);
+    }
   };
 
-  // Crear técnico
+  // --- Crear técnico ---
   const handleCreateTecnico = async () => {
     if (
       !nuevoTecnico.email ||
@@ -148,7 +176,7 @@ export default function TecnicosPage() {
     }
   };
 
-  // Cambiar contraseña existente
+  // --- Cambiar contraseña existente ---
   const handleResetPassword = (auth_user_id: string | null) => {
     if (!auth_user_id) return alert("Usuario inválido");
     setSelectedUserId(auth_user_id);
@@ -177,7 +205,7 @@ export default function TecnicosPage() {
     }
   };
 
-  // Eliminar
+  // --- Eliminar técnico ---
   const handleDelete = async (u: Tecnico) => {
     if (!confirm("¿Eliminar técnico?")) return;
     try {
@@ -199,7 +227,7 @@ export default function TecnicosPage() {
     }
   };
 
-    if (loading) return <div className="p-6 text-gray-600">Cargando...</div>;
+  if (loading) return <div className="p-6 text-gray-600">Cargando...</div>;
 
   return (
     <div className="p-6 space-y-10">
@@ -250,7 +278,13 @@ export default function TecnicosPage() {
                       onChange={(e) => handleChange(u.id, "dni", e.target.value)}
                     />
                   </td>
-                  <td className="px-3 py-2">{u.email}</td>
+                  <td className="px-3 py-2">
+                    <input
+                      className="border p-1 rounded w-full"
+                      value={editando[u.id].email ?? ""}
+                      onChange={(e) => handleChange(u.id, "email", e.target.value)}
+                    />
+                  </td>
                   <td className="px-3 py-2 flex justify-center gap-2">
                     <button onClick={() => handleSave(u.id)}>
                       <Save className="w-5 h-5 text-green-600" />
@@ -438,7 +472,7 @@ export default function TecnicosPage() {
               >
                 Cancelar
               </button>
-              <button
+                            <button
                 onClick={handleCreateTecnico}
                 disabled={creating}
                 className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-60"
@@ -452,3 +486,4 @@ export default function TecnicosPage() {
     </div>
   );
 }
+

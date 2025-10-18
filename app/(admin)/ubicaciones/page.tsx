@@ -1,14 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 export const dynamic = "force-dynamic";
+export const ssr = false;
 
-import nextDynamic from "next/dynamic"; 
-
+import nextDynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { MapPin } from "lucide-react";
 import "leaflet/dist/leaflet.css";
-import L from "leaflet";
 
 // 🧭 Import dinámico de React Leaflet (usando nextDynamic)
 const MapContainer = nextDynamic(() => import("react-leaflet").then((m) => m.MapContainer), { ssr: false });
@@ -17,13 +16,20 @@ const Marker = nextDynamic(() => import("react-leaflet").then((m) => m.Marker), 
 const Popup = nextDynamic(() => import("react-leaflet").then((m) => m.Popup), { ssr: false });
 const Polyline = nextDynamic(() => import("react-leaflet").then((m) => m.Polyline), { ssr: false });
 
-// 🧭 Íconos locales (Leaflet)
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "/leaflet/marker-icon-2x.png",
-  iconUrl: "/leaflet/marker-icon.png",
-  shadowUrl: "/leaflet/marker-shadow.png",
-});
+// ⚙️ Inicializar íconos Leaflet solo en cliente
+let L: typeof import("leaflet") | null = null;
+if (typeof window !== "undefined") {
+  // @ts-ignore
+  import("leaflet").then((leaflet) => {
+    L = leaflet;
+    delete (leaflet.Icon.Default.prototype as any)._getIconUrl;
+    leaflet.Icon.Default.mergeOptions({
+      iconRetinaUrl: "/leaflet/marker-icon-2x.png",
+      iconUrl: "/leaflet/marker-icon.png",
+      shadowUrl: "/leaflet/marker-shadow.png",
+    });
+  });
+}
 
 type Punto = {
   lat: number;

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 "use client";
 /* eslint-disable react/no-unknown-property */
 export const dynamic = "force-dynamic";

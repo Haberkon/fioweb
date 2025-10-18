@@ -1,128 +1,86 @@
-// scripts/simulate-tracking.js
-import dotenv from "dotenv";
-dotenv.config({ path: ".env.local" });
+import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 // =========================================================
-// 🔐 CONFIGURACIÓN
+// ⚙️ CONFIGURACIÓN DE SUPABASE
 // =========================================================
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-  console.error("❌ Faltan variables en .env.local");
-  process.exit(1);
-}
-
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
 // =========================================================
-// 🌍 DATOS BASE
+// 📍 COORDENADAS BASE Y ZONAS
 // =========================================================
-
-// 📍 Depósito (base Castelar)
-const BASE = {
-  nombre: "Depósito Castelar",
-  lat: -34.657221,
-  lng: -58.662317, // Eva Perón 3145, Castelar
-};
-
-// 📍 3 zonas principales
+const BASE = { lat: -34.657221, lng: -58.662317 }; // Eva Perón 3145, Castelar
 const ZONAS = [
   { nombre: "Palermo", lat: -34.583, lng: -58.425 },
   { nombre: "Caballito", lat: -34.618, lng: -58.442 },
   { nombre: "Flores", lat: -34.630, lng: -58.468 },
 ];
 
-// 🔢 Parámetros
-const INTERVAL_MS = 10000; // 10 s
-const PASOS = 10; // total
-const TABLA = "ubicacion_tecnico_test";
-
 // =========================================================
-// 🧩 FUNCIONES AUXILIARES
+// 🚀 ENDPOINT POST
 // =========================================================
-function randomOffset(radio = 0.0025) {
-  return (Math.random() - 0.5) * radio * 2; // ±radio
-}
+export async function POST() {
+  try {
+    console.log("🛰️ Iniciando simulación express de tracking...");
 
-// =========================================================
-// 🚀 FUNCIÓN PRINCIPAL
-// =========================================================
-async function simulateTracking() {
-  console.log("🛰️ Iniciando simulación FIO (modo zonas + regreso directo)...");
+    // 🔹 Obtener 3 técnicos
+    const { data: tecnicos, error: errTec } = await supabase
+      .from("app_user")
+      .select("id, nombre, apellido")
+      .limit(3);
 
-  // 🔹 Obtener técnicos (solo 3)
-  const { data: tecnicos, error } = await supabase
-    .from("app_user")
-    .select("id, nombre, apellido")
-    .limit(3);
+    if (errTec) throw errTec;
+    if (!tecnicos || tecnicos.length === 0)
+      return NextResponse.json({ error: "No hay técnicos para simular" }, { status: 400 });
 
-  if (error || !tecnicos?.length) {
-    console.error("❌ No se pudieron obtener técnicos:", error?.message);
-    return;
-  }
+    // 🔹 Preparar filas a insertar
+    const allRows: any[] = [];
+    const now = new Date();
 
-  const tecnicosConZona = tecnicos.map((t, i) => ({
-    ...t,
-    zona: ZONAS[i],
-  }));
+    for (const [i, t] of tecnicos.entries()) {
+      const zona = ZONAS[i];
+      let lat = zona.lat;
+      let lng = zona.lng;
 
-  console.log(`✅ ${tecnicosConZona.length} técnicos asignados a zonas.`);
+      // 8 movimientos rápidos dentro de la zona
+      for (let j = 0; j < 8; j++) {
+        lat += (Math.random() - 0.5) * 0.004;
+        lng += (Math.random() - 0.5) * 0.004;
 
-  // 🔹 Limpieza previa
-  await supabase.from(TABLA).delete().neq("id", 0);
-  console.log("🧹 Tabla de test limpiada.\n");
-
-  let paso = 0;
-  const interval = setInterval(async () => {
-    paso++;
-    console.log(`\n🧭 Paso ${paso}/${PASOS}`);
-
-    for (const t of tecnicosConZona) {
-      let lat, lng, ruta_activa = true;
-
-      if (paso < PASOS - 1) {
-        // Movimiento aleatorio dentro de la zona
-        lat = t.zona.lat + randomOffset(0.003);
-        lng = t.zona.lng + randomOffset(0.003);
-      } else if (paso === PASOS - 1) {
-        // Último punto antes de regresar
-        lat = t.zona.lat + randomOffset(0.001);
-        lng = t.zona.lng + randomOffset(0.001);
-        console.log(`🏁 ${t.nombre} inicia regreso a base.`);
-      } else {
-        // Llegada directa a la base
-        lat = BASE.lat;
-        lng = BASE.lng;
-        ruta_activa = false;
-        console.log(`🏠 ${t.nombre} llegó a la base.`);
+        const timestamp = new Date(now.getTime() + j * 2000).toISOString(); // simula cada 2 s
+        allRows.push({
+          tecnico_id: t.id,
+          lat,
+          lng,
+          velocidad: Math.round(Math.random() * 40),
+          ruta_activa: true,
+          tomado_en: timestamp,
+        });
       }
 
-      const { error: err } = await supabase.from(TABLA).insert({
+      // Último punto: llegada a la base
+      const endTimestamp = new Date(now.getTime() + 16000).toISOString(); // tras 16 s
+      allRows.push({
         tecnico_id: t.id,
-        lat,
-        lng,
-        velocidad: Math.round(Math.random() * 40) + 10,
-        ruta_activa,
+        lat: BASE.lat,
+        lng: BASE.lng,
+        velocidad: 0,
+        ruta_activa: false,
+        tomado_en: endTimestamp,
       });
-
-      if (err)
-        console.error(`❌ Error insertando ${t.nombre}:`, err.message);
-      else
-        console.log(`📍 ${t.nombre} ${t.apellido} → (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
     }
 
-    // 🔚 Fin de simulación
-    if (paso >= PASOS) {
-      clearInterval(interval);
-      console.log("\n✅ Simulación completa. Todos regresaron a base.");
-      process.exit(0);
-    }
-  }, INTERVAL_MS);
+    // 🔹 Limpiar tabla y reinsertar
+    await supabase.from("ubicacion_tecnico_test").delete().neq("id", 0);
+    const { error } = await supabase.from("ubicacion_tecnico_test").insert(allRows);
+    if (error) throw error;
+
+    console.log(`✅ Insertadas ${allRows.length} ubicaciones en simulación.`);
+    return NextResponse.json({ ok: true, inserted: allRows.length });
+  } catch (err: any) {
+    console.error("❌ Error en simulación:", err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
 }
-
-// Ejecutar si se llama directamente
-if (process.argv[1].includes("simulate-tracking.js")) simulateTracking();
-
-export default simulateTracking;

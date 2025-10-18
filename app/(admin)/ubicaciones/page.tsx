@@ -1,17 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
 "use client";
-/* eslint-disable react/no-unknown-property */
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+import nextDynamic from "next/dynamic"; // 👈 renombrado
 
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import { supabase } from "@/lib/supabaseClient";
 import { MapPin } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
-// 🧭 Íconos locales para Leaflet
+// 🧭 Import dinámico de React Leaflet (usando nextDynamic)
+const MapContainer = nextDynamic(() => import("react-leaflet").then((m) => m.MapContainer), { ssr: false });
+const TileLayer = nextDynamic(() => import("react-leaflet").then((m) => m.TileLayer), { ssr: false });
+const Marker = nextDynamic(() => import("react-leaflet").then((m) => m.Marker), { ssr: false });
+const Popup = nextDynamic(() => import("react-leaflet").then((m) => m.Popup), { ssr: false });
+const Polyline = nextDynamic(() => import("react-leaflet").then((m) => m.Polyline), { ssr: false });
+
+// 🧭 Íconos locales (Leaflet)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "/leaflet/marker-icon-2x.png",
@@ -27,6 +34,17 @@ type Punto = {
   apellido: string;
 };
 
+// Tipado de la respuesta de Supabase
+type UbicacionRow = {
+  lat: number;
+  lng: number;
+  tomado_en: string;
+  app_user?: {
+    nombre?: string;
+    apellido?: string;
+  };
+};
+
 export default function UbicacionesPage() {
   const [puntos, setPuntos] = useState<Punto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +52,9 @@ export default function UbicacionesPage() {
 
   const BASE = { lat: -34.657221, lng: -58.662317 }; // Eva Perón 3145, Castelar
 
+  // =========================================================
+  // 🛰️ Obtener ubicaciones (refresca cada 10s)
+  // =========================================================
   useEffect(() => {
     const fetchData = async () => {
       const inicio = `${fecha}T00:00:00`;
@@ -49,26 +70,26 @@ export default function UbicacionesPage() {
       if (error) {
         console.error("Error cargando ubicaciones:", error.message);
       } else {
-        const pts =
-          data?.map((d: any) => ({
-            lat: d.lat,
-            lng: d.lng,
-            tomado_en: d.tomado_en,
-            nombre: d.app_user?.nombre || "Sin nombre",
-            apellido: d.app_user?.apellido || "",
-          })) || [];
+        const pts = (data as UbicacionRow[]).map((d) => ({
+          lat: d.lat,
+          lng: d.lng,
+          tomado_en: d.tomado_en,
+          nombre: d.app_user?.nombre || "Sin nombre",
+          apellido: d.app_user?.apellido || "",
+        }));
         setPuntos(pts);
       }
       setLoading(false);
     };
 
     fetchData();
-    // 🔄 refrescar cada 10 segundos
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, [fecha]);
 
-  // Agrupar por técnico
+  // =========================================================
+  // 🎨 Agrupar por técnico y asignar colores
+  // =========================================================
   const grupos: Record<string, Punto[]> = {};
   puntos.forEach((p) => {
     const key = `${p.nombre} ${p.apellido}`;
@@ -76,13 +97,14 @@ export default function UbicacionesPage() {
     grupos[key].push(p);
   });
 
-  // Colores distintos por técnico
   const colores = ["#007bff", "#ff5722", "#4caf50", "#9c27b0", "#ff9800", "#009688"];
   const keys = Object.keys(grupos);
-
   const centro: [number, number] =
     puntos.length > 0 ? [puntos[0].lat, puntos[0].lng] : [BASE.lat, BASE.lng];
 
+  // =========================================================
+  // 🧭 Render
+  // =========================================================
   return (
     <div className="p-4 space-y-4">
       {/* 🔹 Header */}
@@ -132,10 +154,10 @@ export default function UbicacionesPage() {
               </Popup>
             </Marker>
 
-            {/* 🔹 Recorridos por técnico */}
+            {/* 🔹 Líneas y marcadores por técnico */}
             {keys.map((key, i) => (
               <Polyline
-                key={key}
+                key={`line-${key}`}
                 positions={grupos[key].map((p) => [p.lat, p.lng])}
                 pathOptions={{
                   color: colores[i % colores.length],
@@ -145,7 +167,6 @@ export default function UbicacionesPage() {
               />
             ))}
 
-            {/* 🔹 Marcadores */}
             {keys.map((key, i) =>
               grupos[key].map((p, j) => (
                 <Marker key={`${key}-${j}`} position={[p.lat, p.lng]}>

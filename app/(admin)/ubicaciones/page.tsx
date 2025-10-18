@@ -2,7 +2,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 export const dynamic = "force-dynamic";
-export const ssr = false;
 
 import nextDynamic from "next/dynamic";
 import { useEffect, useState } from "react";

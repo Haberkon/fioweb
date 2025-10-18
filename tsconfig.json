@@ -1,54 +1,31 @@
 {
   "compilerOptions": {
-    /* ✅ Tipos globales para Node, React y Next */
     "types": ["node", "react", "next"],
-
-    /* ✅ Versión de JS moderna (mejor que ES2017) */
     "target": "ES2022",
-
-    /* ✅ Librerías base */
     "lib": ["dom", "dom.iterable", "esnext"],
-
-    /* ✅ Permite JS pero mantiene TS como base */
     "allowJs": true,
-
-    /* ✅ Fix para react-pdf y cualquier lib externa */
     "skipLibCheck": true,
     "noEmitOnError": false,
-
-    /* ✅ Estricto en chequeos */
-  
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
-
-    /* ✅ Next compila, TS no debe emitir */
     "noEmit": true,
-
-    /* ✅ Compatibilidad con imports */
     "esModuleInterop": true,
     "module": "ESNext",
     "moduleResolution": "Node",
     "resolveJsonModule": true,
-
-    /* ✅ Requerido por Next.js */
     "isolatedModules": true,
     "jsx": "preserve",
-
-    /* ✅ Mejora compilaciones incrementales */
     "incremental": true,
-
-    /* ✅ Plugin oficial de Next.js */
     "plugins": [
-      {
-        "name": "next"
-      }
+      { "name": "next" }
     ],
 
-    /* ✅ Imports absolutos (ej: "@/lib/supabaseServer") */
+    /* ✅ Imports absolutos */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@/scripts/*": ["./scripts/*"]   // 🔹 agregado para que funcione el import
     }
   },
   "include": [

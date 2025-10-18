@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
-import nextDynamic from "next/dynamic"; // 👈 renombrado
+import nextDynamic from "next/dynamic"; 
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";

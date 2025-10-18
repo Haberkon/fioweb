@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 export const dynamic = "force-dynamic";
 export const ssr = false;
@@ -16,12 +17,9 @@ const Marker = nextDynamic(() => import("react-leaflet").then((m) => m.Marker), 
 const Popup = nextDynamic(() => import("react-leaflet").then((m) => m.Popup), { ssr: false });
 const Polyline = nextDynamic(() => import("react-leaflet").then((m) => m.Polyline), { ssr: false });
 
-// ⚙️ Inicializar íconos Leaflet solo en cliente
-let L: typeof import("leaflet") | null = null;
+// ⚙️ Inicializar íconos Leaflet solo en cliente (sin usar variable L)
 if (typeof window !== "undefined") {
-  // @ts-ignore
   import("leaflet").then((leaflet) => {
-    L = leaflet;
     delete (leaflet.Icon.Default.prototype as any)._getIconUrl;
     leaflet.Icon.Default.mergeOptions({
       iconRetinaUrl: "/leaflet/marker-icon-2x.png",
@@ -30,6 +28,7 @@ if (typeof window !== "undefined") {
     });
   });
 }
+
 
 type Punto = {
   lat: number;
